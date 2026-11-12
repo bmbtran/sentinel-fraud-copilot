@@ -1,0 +1,35 @@
+app.js
+  s_0636dc79126953::t_47d7a5fca9cfdf 2,13,23-24
+src/evaluation-suite.js
+  s_0636dc79126953::t_954a968f93a8d0 1-13
+server.mjs
+  s_0636dc79126953::t_33f907544e76d2 8,14,22,28-30,54-55
+README.md
+  s_0636dc79126953::t_5514f22a068a73 11
+styles.css
+  s_0636dc79126953::t_8b8d061dee387b 3
+tests/risk-core.test.mjs
+  s_0636dc79126953::t_0bad9f26d3efc5 5,25-32
+  s_0636dc79126953::t_342a4f947fbc09 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e9075f27e5c5f228c3eeb51b2f2e814b3e1ba5f8",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
