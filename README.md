@@ -16,7 +16,7 @@ The Claude score is a recorded evaluation of `claude-haiku-4-5-20251001` on a fi
 ## What it demonstrates
 
 - A seeded adversarial payment-request dataset
-- A Claude document-analysis proposal that has no payment authority
+- A document-only Claude baseline used for the comparison
 - Deterministic pre-transfer risk checks
 - A vendor-master policy that prevents invoice text from changing payout details
 - An explainable audit trail for each decision
