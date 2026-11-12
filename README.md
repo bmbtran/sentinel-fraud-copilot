@@ -1,35 +1,98 @@
 # Sentinel
 
-**An explainable AI fraud co-pilot built around Plaid transaction data.**
+### A fraud-review prototype that explains the charge before it asks for a decision.
 
-Sentinel builds a personal spending fingerprint, compares deterministic risk rules with Claude’s contextual reasoning, and explains why a transaction was flagged before asking the user to act.
+Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel starts somewhere more useful. It takes a new transaction, compares it with the account’s own spending history, and lays out the specific things that do—or do not—fit.
+
+This is a hackathon prototype for a simple idea: LLMs are good at making messy context understandable, but they should not be the only thing deciding whether someone gets interrupted about their money. Sentinel pairs Claude’s read of a transaction with deterministic signals that can be inspected, tested, and explained.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
-## What is included
+## Why we made this
 
-- Plaid-inspired, responsive command interface with overview, alert center, Trust Lab, and methodology views.
-- Eight realistic, repeatable transaction scenarios across three financial personas.
-- Transparent risk rules for new merchants, amount outliers, unusual timing, duplicates, card testing, velocity, unfamiliar locations, subscription drift, travel context, and unfamiliar cash withdrawals.
-- Hybrid decision policy with risk counterfactuals: “what would make this safer?”
-- Trust Lab that compares a deterministic baseline, contextual AI baseline, and hybrid system on the same labeled scenarios.
-- Optional, server-side live Claude analysis for any selected case.
-- Optional Plaid Sandbox status integration; secrets and access tokens never leave the server.
-- Real SQLite persistence in `data/sentinel.sqlite` for personas, scenarios, user resolutions, and audit events.
+Fraud tooling often has two bad failure modes:
 
-## Run
+- It catches something real but gives the person no useful explanation.
+- It flags something harmless—travel, a new merchant, a large planned purchase—and trains the person to ignore future alerts.
 
-Requires Node 22.13+ because SQLite uses the built-in `node:sqlite` module.
+Sentinel is designed around that second of hesitation before an alert becomes noise. It separates charges into three outcomes:
+
+- **Alert now** when there is strong, connected evidence.
+- **Ask later** when something is unusual but ambiguous.
+- **Leave it alone** when the account history gives a reasonable explanation.
+
+The point is not to claim that a demo can “solve fraud.” The point is to show a better review experience: concrete evidence, uncertainty when it exists, and a clear next step when a person says a charge is not theirs.
+
+## What happens in the demo
+
+1. Pick a person and a transaction scenario.
+2. Sentinel builds a lightweight spending reference from that person’s history: regular merchants, normal purchase sizes, familiar places, and usual active hours.
+3. The rules engine checks for specific signals such as duplicate charges, unusual amount, card testing, rapid spending, and an unfamiliar cash withdrawal.
+4. Claude receives only the relevant transaction context and writes a plain-English read of the situation.
+5. A hybrid policy turns both inputs into **alert**, **ask**, or **ignore**.
+6. If the person selects **“I don’t recognize this,”** Sentinel prepares an incident summary with the charge, related activity, evidence, and issuer-safe next steps.
+
+## What makes it different
+
+| Piece | Why it is there |
+| --- | --- |
+| Personal spending reference | A $300 purchase can be normal for one person and suspicious for another. |
+| Deterministic rules | High-signal patterns such as duplicate charges and card testing remain auditable. |
+| Claude context | Helps explain combinations of facts and surface benign explanations without inventing evidence. |
+| Hybrid decision policy | Keeps the LLM from becoming the sole decision-maker. |
+| Counterfactuals | Shows what would have changed the call—e.g. prior history with a merchant or a lower amount. |
+| Incident handoff | Turns “not me” into something useful instead of a dead-end confirmation button. |
+| Compare Decisions | Replays the same labeled scenarios through rules only, Claude only, and the combined approach. |
+
+## Under the hood
+
+```text
+Plaid Transactions / Demo Scenarios
+                ↓
+   Transaction normalization + SQLite
+                ↓
+  Personal spending reference builder
+                ↓
+  Rules engine ────────┐
+                        ├── Hybrid risk policy ──→ alert / ask / ignore
+  Claude assessment ───┘
+                ↓
+   Evidence + counterfactuals + incident summary
+```
+
+### Stack
+
+- **Frontend:** vanilla JavaScript, semantic HTML, and responsive CSS.
+- **Server:** Node.js HTTP server—small enough to keep the evaluation path readable.
+- **Database:** built-in `node:sqlite`; it stores demo personas, scenarios, audit events, user resolutions, incident summaries, and normalized Plaid transactions.
+- **Plaid:** Sandbox item creation, account lookup, and cursor-based `/transactions/sync` ingestion. Plaid credentials and access tokens stay server-side.
+- **Claude:** optional Anthropic Messages API call for an independent, structured assessment of the selected charge. The live response is validated before display.
+- **Evaluation:** a synthetic, labeled scenario suite that makes the product’s behavior repeatable during a demo.
+
+## The technical choices we cared about
+
+**Keep the evidence inspectable.** Each rule records its own name, score contribution, and human-readable detail. The final risk score is never the only explanation.
+
+**Use the model for interpretation, not authority.** Claude can say why several weak signals may matter together and point out plausible benign context. Deterministic evidence still sets the boundaries around the decision.
+
+**Make the demo repeatable.** The baseline comparison uses seeded scenarios, so a judge can replay the same case and see why Rules Only, Claude Only, and Hybrid disagree. The optional live Claude check is deliberately separate from that repeatable benchmark.
+
+**Do not pretend to be a bank.** Sentinel does not freeze cards, file disputes, move money, or claim production fraud-detection accuracy. The incident summary is a well-organized starting point for a person contacting their issuer through an official channel.
+
+## Run it locally
+
+Sentinel requires Node 22.13+ because the project uses the built-in `node:sqlite` module.
 
 ```powershell
+nvm use 22
 npm start
 ```
 
-Open `http://127.0.0.1:4173`.
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173).
 
-## Configure optional live services
+## Optional live services
 
-Copy the variable names in `.env.example` into `.env` and add:
+Create a local `.env` from `.env.example`:
 
 ```text
 PLAID_CLIENT_ID=...
@@ -39,7 +102,7 @@ ANTHROPIC_API_KEY=...
 CLAUDE_MODEL=claude-haiku-4-5-20251001
 ```
 
-Without either key, Sentinel still runs as a complete deterministic demo. Plaid Sandbox enables the connection status check. Anthropic enables the **Run live Claude analysis** control in the Alert Center.
+The app is still fully demoable without keys. Plaid turns on the Sandbox connection and sync path. Anthropic turns on **Ask Claude to review it** for a selected charge.
 
 ## Test
 
@@ -47,6 +110,6 @@ Without either key, Sentinel still runs as a complete deterministic demo. Plaid 
 npm test
 ```
 
-## Safety and evaluation note
+## A note on evaluation
 
-The Trust Lab uses synthetic, labeled scenarios to make the product’s behavior inspectable. Its metrics are not claims of production fraud performance. Sentinel does not freeze cards, contact issuers, create disputes, or move money.
+The Compare Decisions screen uses made-up, labeled scenarios. It exists to make the prototype’s choices legible; its precision, recall, and F1 scores are not a claim about real-world fraud performance.
