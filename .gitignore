@@ -6,4 +6,5 @@ node_modules/
 dist/
 server.out.log
 server.err.log
+data/audit-ledger.json
 
