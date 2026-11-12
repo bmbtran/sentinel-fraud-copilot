@@ -13,10 +13,10 @@
   </head>
   <body>
     <div class="shell">
-      <header><a href="#command" class="brand">TransferTrust<span>•</span></a><span class="environment">PLAID SANDBOX</span><span class="header-copy">risk-gated ACH authorization</span><span id="connection" class="connection">Connecting Plaid…</span></header>
-      <aside><p class="nav-label">OPERATIONS</p><nav><button data-view="command" class="active">Command center</button><button data-view="queue">Payment queue</button><button data-view="graph">Relationship graph</button><button data-view="audit">Audit trail</button></nav><div class="sidebar-note"><b>Demo safety</b><span>Authorization only. Transfer creation is disabled.</span></div></aside>
+      <header><a href="#command" class="brand">TransferTrust<span>•</span></a><span class="environment">PLAID SANDBOX</span><span class="header-copy">risk-gated ACH authorization</span><button id="connect-plaid" class="connect-button">Connect account</button><span id="connection" class="connection">Connecting Plaid…</span></header>
+      <aside><p class="nav-label">OPERATIONS</p><nav><button data-view="command" class="active">Command center</button><button data-view="studio">Scenario studio</button><button data-view="queue">Payment queue</button><button data-view="graph">Relationship graph</button><button data-view="audit">Audit trail</button></nav><div class="sidebar-note"><b>Demo safety</b><span>Authorization only. Transfer creation is disabled.</span></div></aside>
       <main id="app" aria-live="polite"><div class="loading">Loading risk command center…</div></main>
     </div>
-    <script type="module" src="app.js"></script>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script><script type="module" src="app.js"></script>
   </body>
 </html>
