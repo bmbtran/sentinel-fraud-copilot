@@ -4,7 +4,7 @@ import { metrics, runBenchmark } from "./src/risk-engine.js";
 let results = runBenchmark(requests);
 const firstRisk = results.find((result) => result.request.category === "bank_change");
 const savedReviews = (() => { try { return JSON.parse(localStorage.getItem("transfer-trust-reviews") ?? "{}"); } catch { return {}; } })();
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews };
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
 const reviewProgress = document.querySelector("#review-progress");
@@ -42,6 +42,7 @@ function filteredResults() {
 function statusClass(decision) { return decision === "block" ? "block" : decision === "hold" ? "hold" : "approve"; }
 function decisionLabel(decision) { return decision === "block" ? "Blocked" : decision === "hold" ? "Hold" : "Approved"; }
 function currency(value) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
+function escapeHtml(value) { return String(value ?? "—").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]); }
 function saveReviews() { localStorage.setItem("transfer-trust-reviews", JSON.stringify(state.reviews)); }
 function updateReviewProgress() { reviewProgress.textContent = `${Object.keys(state.reviews).length} ${Object.keys(state.reviews).length === 1 ? "review" : "reviews"} recorded locally`; }
 function traceFor(request, decision) {
@@ -58,6 +59,21 @@ function traceFor(request, decision) {
   ];
 }
 
+function documentForClaude(request) {
+  return `Vendor: ${request.vendor}\nInvoice ID: ${request.invoiceId}\nRequested amount: ${currency(request.amount)}\nRequested destination: ${request.account}\nPurpose: ${request.note}${request.hiddenText ? `\nAdditional document text: ${request.hiddenText}` : ""}`;
+}
+
+function renderAiProposal(request) {
+  const record = state.aiByInvoice[request.invoiceId];
+  const loading = state.extractingInvoice === request.invoiceId;
+  if (loading) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · UNTRUSTED PROPOSAL</p><h3>Reading the source document…</h3><p>TransferTrust will still evaluate the original document and trusted records independently.</p></div><span class="ai-state">Extracting</span></section>`;
+  if (record?.error) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · UNTRUSTED PROPOSAL</p><h3>Extraction unavailable</h3><p>${escapeHtml(record.error)}</p></div><button class="ai-extract-button" type="button" data-run-ai>Try Claude extraction</button></section>`;
+  if (!record) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · UNTRUSTED PROPOSAL</p><h3>Let Claude read this request</h3><p>Claude can extract terms and make a nonbinding recommendation. It cannot release a payment.</p></div><button class="ai-extract-button" type="button" data-run-ai>Extract with Claude</button></section>`;
+  const { terms, model } = record;
+  const recommendation = terms.recommendedDecision ? `${decisionLabel(terms.recommendedDecision)} — ${terms.recommendationReason ?? "No reason returned"}` : "No recommendation returned";
+  return `<section class="ai-proposal"><div class="ai-proposal-head"><div><p class="section-kicker">CLAUDE AGENT · UNTRUSTED PROPOSAL</p><h3>Structured terms extracted</h3></div><button class="ai-extract-button" type="button" data-run-ai>Run again</button></div><dl class="ai-terms"><div><dt>Vendor</dt><dd>${escapeHtml(terms.vendor)}</dd></div><div><dt>Invoice</dt><dd>${escapeHtml(terms.invoiceId)}</dd></div><div><dt>Amount</dt><dd>${terms.amount == null ? "—" : escapeHtml(currency(terms.amount))}</dd></div><div><dt>Account</dt><dd>${escapeHtml(terms.account)}</dd></div></dl><p class="ai-recommendation"><b>Agent recommendation:</b> ${escapeHtml(recommendation)}</p>${terms.suspiciousContent ? `<p class="ai-warning"><b>Agent-noted text:</b> ${escapeHtml(terms.suspiciousContent)}</p>` : ""}<p class="ai-footnote">${escapeHtml(model)} · Proposal only. The enforced-policy result above is calculated separately from the original document and verified records.</p></section>`;
+}
+
 function renderPanel(result) {
   const { request, naive, protected: protectedResult } = result;
   const evidence = request.hiddenText || request.note;
@@ -72,6 +88,7 @@ function renderPanel(result) {
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
     <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
+    ${renderAiProposal(request)}
     <section class="proof-section"><h3>Control trace</h3>${trace}</section>
     <button class="source-document-button" type="button" data-view-document>View source document</button>
     <div class="review-record"><p>${localReview ? `<strong>Review recorded</strong><br />${new Date(localReview.recordedAt).toLocaleString()}` : "No operator review recorded yet. This demo stores review acknowledgements locally in the browser."}</p><button class="review-button" type="button" data-review-action="${localReview ? "remove" : "record"}">${localReview ? "Remove local review" : `Record ${decisionLabel(protectedResult.decision)} review`}</button></div>
@@ -100,12 +117,31 @@ document.querySelector("#filter-search").addEventListener("input", (event) => { 
 list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
 panel.addEventListener("click", (event) => {
   if (event.target.closest("button[data-view-document]")) { openSourceDocument(); return; }
+  if (event.target.closest("button[data-run-ai]")) { runClaudeExtraction(); return; }
   const button = event.target.closest("button[data-review-action]");
   if (!button || !state.selected) return;
   if (button.dataset.reviewAction === "remove") delete state.reviews[state.selected];
   else state.reviews[state.selected] = { decision: results.find((result) => result.request.invoiceId === state.selected)?.protected.decision, recordedAt: new Date().toISOString() };
   saveReviews(); updateReviewProgress(); renderList();
 });
+async function runClaudeExtraction() {
+  const result = results.find((item) => item.request.invoiceId === state.selected);
+  if (!result || state.extractingInvoice) return;
+  const invoiceId = result.request.invoiceId;
+  state.extractingInvoice = invoiceId;
+  renderPanel(result);
+  try {
+    const response = await fetch("/api/ai/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document: documentForClaude(result.request) }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? "Claude extraction failed.");
+    state.aiByInvoice[invoiceId] = payload;
+  } catch (error) {
+    state.aiByInvoice[invoiceId] = { error: error instanceof Error ? error.message : "Claude extraction failed." };
+  } finally {
+    state.extractingInvoice = null;
+    renderList();
+  }
+}
 const sourceDialog = document.querySelector("#source-document-dialog");
 const sourceDocumentContent = document.querySelector("#source-document-content");
 function openSourceDocument() {
