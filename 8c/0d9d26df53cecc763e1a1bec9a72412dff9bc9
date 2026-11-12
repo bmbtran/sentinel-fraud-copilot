@@ -1,0 +1,29 @@
+README.md
+  s_0636dc79126953::t_7fb412d09f96c1 19
+styles.css
+  s_0636dc79126953::t_018aff86687cb4 52,56
+app.js
+  s_0636dc79126953::t_018aff86687cb4 158
+  s_0636dc79126953::t_7fe0f90f86082d 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8c0d9d26df53cecc763e1a1bec9a72412dff9bc9",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
