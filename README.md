@@ -1,10 +1,10 @@
 # Sentinel
 
-### A fraud-review prototype that explains the charge before it asks for a decision.
+### A demo app for reviewing suspicious charges with Plaid data, rules, and Claude.
 
-Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel starts somewhere more useful. It takes a new transaction, compares it with the account’s own spending history, and lays out the specific things that do—or do not—fit.
+Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel compares a new transaction with the account’s spending history and shows the details that do not fit.
 
-This is a hackathon prototype for a simple idea: LLMs are good at making messy context understandable, but they should not be the only thing deciding whether someone gets interrupted about their money. Sentinel pairs Claude’s read of a transaction with deterministic signals that can be inspected, tested, and explained.
+This hackathon project uses Claude to explain the context around a charge. Rule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
@@ -21,7 +21,7 @@ Sentinel is designed around that second of hesitation before an alert becomes no
 - **Ask later** when something is unusual but ambiguous.
 - **Leave it alone** when the account history gives a reasonable explanation.
 
-The point is not to claim that a demo can “solve fraud.” The point is to show a better review experience: concrete evidence, uncertainty when it exists, and a clear next step when a person says a charge is not theirs.
+Sentinel does not claim to solve fraud. It gives people evidence, shows uncertainty when it exists, and prepares a short summary when they do not recognize a charge.
 
 ## What happens in the demo
 
