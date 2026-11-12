@@ -1,0 +1,64 @@
+README.md
+  s_0636dc79126953::t_55dfb961dec53c 5,11-12,14,19,42-44
+  s_0636dc79126953::t_e83d94b78cd20e 45
+docs/case-study.md
+  s_0636dc79126953::t_55dfb961dec53c 15,18,26-27
+docs/interview-demo.md
+  s_0636dc79126953::t_55dfb961dec53c 5,12-17,21,33,35,43
+server.mjs
+  s_0636dc79126953::t_f2b7d2bf5d330f 47-61,91-95,97,100-107,109-110,199-212,214
+  s_0636dc79126953::t_0a5f4cb20c8a3a 90,96,99,108,111-123,216
+  s_0636dc79126953::t_e68dfc2c1fff2f 98
+  s_0636dc79126953::t_029bb113bbe9ae 124
+  s_0636dc79126953::t_26d7f71160df87 213
+  s_0636dc79126953::t_ca3a7539eb3202 215
+app.js
+  s_0636dc79126953::t_83c4c19c39255d 8,30
+  s_0636dc79126953::t_26f1fe60e31171 94
+  s_0636dc79126953::t_191d0e9089bf64 35-36
+  s_0636dc79126953::t_1f238d54f5fa56 29,31,37-39,78-81,95,106,162-170,172-180,197
+  s_0636dc79126953::t_c99ac116b44af8 9
+  s_0636dc79126953::t_a784d86cef6dad 40-42
+  s_0636dc79126953::t_b11c86bcf84550 171
+  s_2cffba74d59462::t_abf3bb0db48499 2
+src/data.js
+  s_0636dc79126953::t_6706dadbb469f2 23-24,29-40,46-48
+styles.css
+  s_0636dc79126953::t_1f238d54f5fa56 21
+index.html
+  s_0636dc79126953::t_26f1fe60e31171 37,39,45,67
+  s_0636dc79126953::t_6f7d7f78f64344 40
+tests/risk-engine.test.mjs
+  s_0636dc79126953::t_6706dadbb469f2 13
+src/agent-benchmark.js
+  s_2cffba74d59462::t_669227a3581690 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0da205cf96b981706fd69024464e5b8654508f65",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    },
+    "s_2cffba74d59462": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf61-3366-7d63-8742-ccdb70d0921f",
+        "model": "unknown"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
