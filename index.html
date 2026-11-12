@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="TransferTrust payment-change fraud screening demo" />
+    <title>TransferTrust — controls before money moves</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="topbar" aria-label="Primary navigation">
+        <a class="brand" href="#top" aria-label="TransferTrust home"><span class="brand-mark">↗</span>TransferTrust</a>
+        <span class="nav-status"><i></i> DEMO ENVIRONMENT</span>
+      </nav>
+
+      <section class="hero" id="top">
+        <p class="eyebrow">PAYMENT-CHANGE RISK · PORTFOLIO DEMO</p>
+        <h1>Stop the request<br />before it becomes <em>a transfer.</em></h1>
+        <p class="hero-copy">A transparent control layer for payment requests. Same batch. Same invoices. Measurably different outcome.</p>
+        <div class="hero-footnote">Synthetic scenarios only · No real customer or financial data</div>
+      </section>
+
+      <section class="benchmark" aria-labelledby="benchmark-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">THE BENCHMARK</p>
+            <h2 id="benchmark-title">One batch. Two outcomes.</h2>
+          </div>
+          <p class="caption">30 payment requests &nbsp;·&nbsp; 12 seeded fraud attempts &nbsp;·&nbsp; 16 clean payments</p>
+        </div>
+        <div class="scoreboard">
+          <article class="score-card muted">
+            <p class="score-label">Naive review</p>
+            <strong><span id="naive-stopped">0</span><small>/12</small></strong>
+            <p>fraud attempts stopped</p>
+            <div class="score-detail"><span>Funds sent to attacker accounts</span><b>9</b></div>
+          </article>
+          <div class="arrow" aria-hidden="true">→</div>
+          <article class="score-card protected">
+            <p class="score-label">TransferTrust controls</p>
+            <strong><span id="protected-stopped">12</span><small>/12</small></strong>
+            <p>fraud attempts stopped</p>
+            <div class="score-detail"><span>Clean payments incorrectly held</span><b id="clean-held">0</b></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="workbench" aria-labelledby="workbench-title">
+        <div class="section-heading workbench-heading">
+          <div>
+            <p class="eyebrow">REVIEW WORKBENCH</p>
+            <h2 id="workbench-title">Inspect the evidence.</h2>
+          </div>
+          <div class="legend"><span><i class="dot block"></i> Blocked</span><span><i class="dot hold"></i> Held for review</span><span><i class="dot approve"></i> Approved</span></div>
+        </div>
+        <div class="filters" role="toolbar" aria-label="Filter payment requests">
+          <button class="active" data-filter="all">All requests <span>30</span></button>
+          <button data-filter="attack">Fraud scenarios <span>12</span></button>
+          <button data-filter="clean">Clean payments <span>16</span></button>
+          <button data-filter="exception">Control exceptions <span>2</span></button>
+        </div>
+        <div class="request-layout">
+          <div class="request-list" id="request-list" aria-label="Payment requests"></div>
+          <aside class="detail-panel" id="detail-panel" aria-live="polite">
+            <p class="eyebrow">SELECT A REQUEST</p>
+            <h3>Decision evidence appears here.</h3>
+            <p>Choose any payment request to compare the naive decision with the protected flow.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="controls" aria-labelledby="controls-title">
+        <div>
+          <p class="eyebrow">CONTROL DESIGN</p>
+          <h2 id="controls-title">Guard the source of truth.</h2>
+        </div>
+        <div class="control-grid">
+          <article><span>01</span><h3>Screen first</h3><p>Invoice text is screened before any payment decision. A risk signal ends the flow early.</p></article>
+          <article><span>02</span><h3>Verify structurally</h3><p>Payment details are matched to the vendor master—not copied from an untrusted document.</p></article>
+          <article><span>03</span><h3>Leave a receipt</h3><p>Every outcome has a concise, deterministic reason an operator can inspect.</p></article>
+        </div>
+      </section>
+
+      <footer><span>TransferTrust</span><span>Built as an engineering portfolio demonstration · 2026</span></footer>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
