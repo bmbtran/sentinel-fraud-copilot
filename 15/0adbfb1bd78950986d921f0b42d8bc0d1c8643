@@ -1,0 +1,30 @@
+.gitignore
+  s_0636dc79126953::t_3a1e95b2ed7f40 9
+app.js
+  s_0636dc79126953::t_02b33d25083389 18
+src/audit-store.js
+  s_0636dc79126953::t_cccbe13212a4e8 1-37
+server.mjs
+  s_0636dc79126953::t_5409dd78c6adc0 1,9,23,26,29,44,49-50,54,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "150adbfb1bd78950986d921f0b42d8bc0d1c8643",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
