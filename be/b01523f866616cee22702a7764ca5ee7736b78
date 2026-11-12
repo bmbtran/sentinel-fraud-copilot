@@ -1,0 +1,32 @@
+styles.css
+  s_0636dc79126953::t_a115351dce99f0 4
+app.js
+  s_0636dc79126953::t_c341bb1b3f331e 17,20,25-26,30
+src/scenario-store.js
+  s_0636dc79126953::t_0e4b7f7ea69c20 1-9
+server.mjs
+  s_0636dc79126953::t_d945430b9ce8a6 10,27-28,41,53,62-66
+index.html
+  s_0636dc79126953::t_2afd0d665a8733 16-17,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "beb01523f866616cee22702a7764ca5ee7736b78",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
