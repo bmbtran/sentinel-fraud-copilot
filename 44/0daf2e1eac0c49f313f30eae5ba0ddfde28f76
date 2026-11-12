@@ -1,0 +1,29 @@
+server.mjs
+  s_0636dc79126953::t_d04278c7c467c0 42,59
+app.js
+  s_0636dc79126953::t_d04278c7c467c0 73
+  s_0636dc79126953::t_c719a160ef56d4 69-71,74
+index.html
+  s_0636dc79126953::t_c719a160ef56d4 37,39-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "440daf2e1eac0c49f313f30eae5ba0ddfde28f76",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
