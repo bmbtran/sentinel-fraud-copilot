@@ -1,0 +1,38 @@
+server.mjs
+  s_0636dc79126953::t_f09f267845b668 12
+app.js
+  s_0636dc79126953::t_7141e8f085616f 1,5-8,11-13,24-26
+  s_0636dc79126953::t_ece2a6a5343d48 184-185,219-242,318,322,335,341-343
+  s_0636dc79126953::t_58c3d3aa3153a1 90-166
+  s_0636dc79126953::t_4d58cbd43b11fd 27
+index.html
+  s_0636dc79126953::t_f09f267845b668 8
+  s_0636dc79126953::t_13ccfb6be19299 24-26,69-86
+favicon.svg
+  s_0636dc79126953::t_f09f267845b668 1-5
+styles.css
+  s_0636dc79126953::t_2a6603c77c7cb9 29-32
+src/risk-engine.js
+  s_0636dc79126953::t_54315a02253754 13-22,26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "14a979398ed453457126c78070618ecc2110446a",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
