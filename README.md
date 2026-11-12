@@ -38,43 +38,15 @@ The main implementation is small enough to inspect from GitHub:
 - [`app.js`](app.js): the client-side review flow.
 - [`tests/sentinel-core.test.mjs`](tests/sentinel-core.test.mjs): checks for card-testing evidence, travel context, and benchmark separation.
 
-## Why we made this
+## Design notes
 
-Fraud tooling often has two bad failure modes:
+The app separates charges into three outcomes: **alert**, **ask**, and **ignore**. A new merchant or a large purchase alone is not enough to trigger an alert. The decision also considers the account's prior spending, nearby transactions, time of day, location, and category.
 
-- It catches something real but gives the person no useful explanation.
-- It flags something harmless—travel, a new merchant, a large planned purchase—and trains the person to ignore future alerts.
+Each rule keeps its name, score contribution, and supporting detail. Claude receives a minimized transaction context and returns a structured assessment. The hybrid policy uses both results, then produces counterfactuals that explain what would lower the risk score.
 
-Sentinel is designed around that second of hesitation before an alert becomes noise. It separates charges into three outcomes:
+The comparison page replays the same labeled scenarios through Rules Only, Claude Only, and the hybrid policy. The incident flow reuses the same evidence to prepare a summary when a user says a charge is not theirs.
 
-- **Alert now** when there is strong, connected evidence.
-- **Ask later** when something is unusual but ambiguous.
-- **Leave it alone** when the account history gives a reasonable explanation.
-
-Sentinel does not claim to solve fraud. It gives people evidence, shows uncertainty when it exists, and prepares a short summary when they do not recognize a charge.
-
-## What happens in the demo
-
-1. Pick a person and a transaction scenario.
-2. Sentinel builds a lightweight spending reference from that person’s history: regular merchants, normal purchase sizes, familiar places, and usual active hours.
-3. The rules engine checks for specific signals such as duplicate charges, unusual amount, card testing, rapid spending, and an unfamiliar cash withdrawal.
-4. Claude receives only the relevant transaction context and writes a plain-English read of the situation.
-5. A hybrid policy turns both inputs into **alert**, **ask**, or **ignore**.
-6. If the person selects **“I don’t recognize this,”** Sentinel prepares an incident summary with the charge, related activity, evidence, and issuer-safe next steps.
-
-## What makes it different
-
-| Piece | Why it is there |
-| --- | --- |
-| Personal spending reference | A $300 purchase can be normal for one person and suspicious for another. |
-| Deterministic rules | High-signal patterns such as duplicate charges and card testing remain auditable. |
-| Claude context | Helps explain combinations of facts and surface benign explanations without inventing evidence. |
-| Hybrid decision policy | Keeps the LLM from becoming the sole decision-maker. |
-| Counterfactuals | Shows what would have changed the call—e.g. prior history with a merchant or a lower amount. |
-| Incident handoff | Turns “not me” into something useful instead of a dead-end confirmation button. |
-| Compare Decisions | Replays the same labeled scenarios through rules only, Claude only, and the combined approach. |
-
-## Under the hood
+## Architecture
 
 ```text
 Plaid Transactions / Demo Scenarios
@@ -93,21 +65,21 @@ Plaid Transactions / Demo Scenarios
 ### Stack
 
 - **Frontend:** vanilla JavaScript, semantic HTML, and responsive CSS.
-- **Server:** Node.js HTTP server—small enough to keep the evaluation path readable.
+- **Server:** Node.js HTTP server, kept small enough to make the evaluation path easy to follow.
 - **Database:** built-in `node:sqlite`; it stores demo personas, scenarios, audit events, user resolutions, incident summaries, and normalized Plaid transactions.
 - **Plaid:** Sandbox item creation, account lookup, and cursor-based `/transactions/sync` ingestion. Plaid credentials and access tokens stay server-side.
 - **Claude:** optional Anthropic Messages API call for an independent, structured assessment of the selected charge. The live response is validated before display.
 - **Evaluation:** a synthetic, labeled scenario suite that makes the product’s behavior repeatable during a demo.
 
-## The technical choices we cared about
+## Implementation choices
 
-**Keep the evidence inspectable.** Each rule records its own name, score contribution, and human-readable detail. The final risk score is never the only explanation.
+Each rule records its own name, score contribution, and detail. The UI can show the score and the evidence behind it.
 
-**Use the model for interpretation, not authority.** Claude can say why several weak signals may matter together and point out plausible benign context. Deterministic evidence still sets the boundaries around the decision.
+Claude explains the context around a transaction. It does not decide the final action by itself. The deterministic policy keeps duplicate charges, card testing, and other high-signal patterns visible and testable.
 
-**Make the demo repeatable.** The baseline comparison uses seeded scenarios, so a judge can replay the same case and see why Rules Only, Claude Only, and Hybrid disagree. The optional live Claude check is deliberately separate from that repeatable benchmark.
+The comparison page uses seeded scenarios so the same input can be replayed. The optional live Claude check is separate from that benchmark, since model output can vary between calls.
 
-**Do not pretend to be a bank.** Sentinel does not freeze cards, file disputes, move money, or claim production fraud-detection accuracy. The incident summary is a well-organized starting point for a person contacting their issuer through an official channel.
+Sentinel does not freeze cards, file disputes, move money, or claim real-world fraud accuracy. The incident summary gives the user a concise record before they contact their issuer.
 
 ## Run it locally
 
