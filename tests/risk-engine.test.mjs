@@ -10,7 +10,7 @@ test("protected path stops every seeded fraud scenario without holding clean pay
 });
 
 test("vendor-master mismatch cannot be approved", () => {
-  const request = requests.find((item) => item.category === "lookalike_vendor");
+  const request = requests.find((item) => item.category === "unverified_vendor");
   assert.equal(protectedDecision(request).decision, "hold");
 });
 

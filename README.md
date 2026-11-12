@@ -2,20 +2,21 @@
 
 **A transparent fraud-screening demo for payment-change requests.**
 
-TransferTrust makes a simple, testable claim: the same synthetic batch that slips through a naive review flow can be caught before money moves when deterministic safeguards run first.
+TransferTrust tests a simple boundary: a document-only AI agent cannot verify facts it cannot see, while deterministic safeguards can compare a request with trusted records before release.
 
 ## The demo moment
 
 | Flow | Fraud attempts stopped | Legitimate payments incorrectly held |
 | --- | ---: | ---: |
-| Naive review | 0 / 12 | 0 |
-| TransferTrust controls | 12 / 12 | 0 |
+| Document-only Claude baseline | 3 / 12 | Not evaluated in this fixture run |
+| TransferTrust controls | 12 / 12 | 0 / 16 |
 
-The data is synthetic and the controls are illustrative. This is not a real payment processor or fraud-prevention system.
+The Claude score is a recorded evaluation of `claude-haiku-4-5-20251001` on a fixed synthetic fixture set, one document at a time and without vendor-master, PO, history, or balance data. The data is synthetic and the controls are illustrative. This is not a real payment processor or fraud-prevention system.
 
 ## What it demonstrates
 
 - A seeded adversarial payment-request dataset
+- A Claude document-analysis proposal that has no payment authority
 - Deterministic pre-transfer risk checks
 - A vendor-master policy that prevents invoice text from changing payout details
 - An explainable audit trail for each decision
@@ -37,6 +38,10 @@ Run the deterministic benchmark tests with:
 ```powershell
 npm test
 ```
+
+### Claude (optional)
+
+Add `ANTHROPIC_API_KEY` to local `.env`. Claude is called server-side only. The dashboard can show a recorded fixture evaluation or re-run the document-only autonomous-agent baseline; both are simulated decisions and cannot execute a payment.
 
 ### Plaid Sandbox (optional)
 

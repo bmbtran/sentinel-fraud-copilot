@@ -2,22 +2,23 @@
 
 ## The opening (20 seconds)
 
-> “TransferTrust is a small payment-risk demonstration built around an outcome that matters: the same 30 synthetic payment requests go from 0 of 12 fraud attempts stopped to 12 of 12 stopped, without holding any of the 16 clean payments.”
+> “TransferTrust asks what happens when an AI agent sees only a clean-looking payment document, versus when the same request is checked against trusted records. In a fixed synthetic run, Claude stopped 3 of 12 context-gap cases; the enforced policy stopped all 12 without holding any of the 16 clean payments.”
 
 Clarify that all requests and vendors are synthetic. The point is the engineering pattern, not a production fraud-rate claim.
 
 ## The walkthrough (three minutes)
 
 1. Start at the benchmark cards. Explain that both flows receive the exact same immutable test batch.
-2. Open a **hidden instruction**. The naive path approves it because it treats document text as trusted context. The protected path blocks it before a payment decision.
-3. Open a **bank-change request**. Explain the key boundary: invoice text cannot update payout details. Only the vendor master is authoritative.
-4. Open a **look-alike vendor**. The text screen cannot reliably identify a visually similar name; the structural vendor-master match instead holds it for review. This is the deliberately honest limitation in the demo.
-5. Filter to **clean payments**. The protected result keeps all 16 moving, showing that the project is not simply a “block everything” rule.
-6. Open the **insufficient-funds** exception. Explain that the Plaid Sandbox funding source contributes a live available-balance snapshot; this request is held because its amount exceeds the connected account's available funds.
+2. Select **Evaluate Claude baseline** if you want to re-run the model. It receives one document at a time with simulated authority, but no trusted context. The recorded score is shown by default.
+3. Open a **destination mismatch**. The invoice looks ordinary, but the vendor master rejects its requested account.
+4. Open a **vendor identity mismatch**. Explain that the apparent vendor name is insufficient; the verified identity from the intake record must also match.
+5. Open a **purchase-order mismatch**. The document contains one amount; the deterministic policy sees a different approved amount that Claude cannot see.
+6. Filter to **clean payments**. The protected result keeps all 16 moving, showing that the project is not simply a “block everything” rule.
+7. Open the **insufficient-funds** exception. Explain that the Plaid Sandbox funding source contributes a current available-balance snapshot; this request is held because its amount exceeds the connected account's available funds.
 
 ## Engineering decisions to highlight
 
-- **Deterministic controls before automation.** Payment safety does not depend on a model being cautious.
+- **AI for interpretation; policy for authority.** Claude can propose and explain, but it cannot authorize a release.
 - **Separation of concerns.** `src/data.js` owns the scenario manifest; `src/risk-engine.js` owns pure decision logic; `app.js` only renders results.
 - **Fixed benchmark.** The result is reproducible and tested rather than a hand-picked dashboard statistic.
 - **Explainability.** Every blocked, held, and approved item exposes the applied control and reason.
@@ -29,11 +30,9 @@ Clarify that all requests and vendors are synthetic. The point is the engineerin
 ```text
 Synthetic request batch
         │
-        ├── Naive review ───────────────► approve / hold
+        ├── Claude, document-only ──────► simulated approve / hold / block
         │
-        └── TransferTrust controls
-              ├── input screen
-              ├── sensitive-data check
+        └── TransferTrust enforced policy
               ├── vendor-master verification
               ├── purchase-order check
               └── duplicate check ─────► block / hold / approve + reason
@@ -41,4 +40,4 @@ Synthetic request batch
 
 ## Validation
 
-`npm test` verifies the intended benchmark contract: the naive flow stops 0/12 attacks; the protected flow stops 12/12 while holding 0/16 clean payments.
+`npm test` verifies the deterministic policy contract: it stops 12/12 context-gap fixtures while holding 0/16 clean payments. `src/agent-benchmark.js` records the named Claude/model evaluation for the fixed document-only fixture run.

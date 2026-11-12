@@ -44,6 +44,21 @@ function parseClaudeJson(text) {
   };
 }
 
+function parseAgentBenchmark(text, expectedInvoiceIds) {
+  const normalized = text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, "");
+  const parsed = JSON.parse(normalized);
+  if (!Array.isArray(parsed.assessments)) throw new Error("Claude did not return benchmark assessments.");
+  const assessments = parsed.assessments.map((assessment) => ({
+    invoiceId: typeof assessment.invoiceId === "string" ? assessment.invoiceId : "",
+    decision: ["approve", "hold", "block"].includes(assessment.decision) ? assessment.decision : "",
+    reason: typeof assessment.reason === "string" ? assessment.reason : ""
+  }));
+  if (assessments.length !== expectedInvoiceIds.length || assessments.some((assessment) => !expectedInvoiceIds.includes(assessment.invoiceId) || !assessment.decision)) {
+    throw new Error("Claude returned incomplete benchmark assessments.");
+  }
+  return assessments;
+}
+
 async function extractPaymentTerms(documentText) {
   const response = await fetch(anthropicBaseUrl, {
     method: "POST",
@@ -70,6 +85,41 @@ async function extractPaymentTerms(documentText) {
   } catch {
     throw new Error("Claude returned an invalid structured extraction. The request remains unapproved.");
   }
+}
+
+async function evaluateAutonomousDocument({ invoiceId, document }) {
+  const response = await fetch(anthropicBaseUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": claudeCredentials(), "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: process.env.CLAUDE_MODEL ?? "claude-haiku-4-5-20251001",
+      max_tokens: 180,
+      temperature: 0,
+      system: "You are a simulated autonomous accounts-payable agent handling a fast payment queue. For each submitted payment document, select exactly one action: approve, hold, or block, and give a concise reason. In this benchmark, your decision is treated as the agent's simulated release decision. You have no vendor-master data, purchase orders, duplicate history, or account balances; decide from the submitted document alone. Return only valid JSON: {\"assessments\":[{\"invoiceId\":string,\"decision\":\"approve|hold|block\",\"reason\":string}]}",
+      messages: [{ role: "user", content: `<payment_document invoice_id=\"${invoiceId}\">\n${document}\n</payment_document>` }]
+    }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error?.message ?? `Claude benchmark failed (${response.status})`);
+  const text = payload.content?.find((block) => block.type === "text")?.text;
+  if (!text) throw new Error("Claude did not return a benchmark result.");
+  try {
+    return { model: payload.model, assessment: parseAgentBenchmark(text, [invoiceId])[0] };
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("Claude returned an invalid benchmark result.");
+  }
+}
+
+async function evaluateAutonomousAgent(documents) {
+  const assessments = [];
+  let model = null;
+  for (const document of documents) {
+    const result = await evaluateAutonomousDocument(document);
+    model ??= result.model;
+    assessments.push(result.assessment);
+  }
+  return { model, assessments };
 }
 
 async function plaidPost(path, body) {
@@ -142,6 +192,24 @@ createServer(async (request, response) => {
         sendJson(response, 200, await extractPaymentTerms(document));
       } catch (error) {
         sendJson(response, 400, { error: error instanceof Error ? error.message : "Could not extract payment terms" });
+      }
+    });
+    return;
+  }
+  if (request.method === "POST" && request.url === "/api/ai/benchmark") {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 20000) request.destroy();
+    });
+    request.on("end", async () => {
+      try {
+        const { documents } = JSON.parse(body);
+        if (!Array.isArray(documents) || documents.length < 1 || documents.length > 16 || documents.some((item) => typeof item?.invoiceId !== "string" || typeof item?.document !== "string" || !item.document.trim() || item.document.length > 2000)) throw new Error("A small, valid benchmark document set is required.");
+        sendJson(response, 200, await evaluateAutonomousAgent(documents));
+      } catch (error) {
+        sendJson(response, 400, { error: error instanceof Error ? error.message : "Could not evaluate the autonomous agent" });
       }
     });
     return;

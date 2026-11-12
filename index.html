@@ -34,15 +34,15 @@
             <div class="title-row"><div><h1>Payment change review</h1><p>Fixture batch F-01 · <span id="batch-count">0</span> requests awaiting operator review</p></div><div class="run-tools"><span id="review-progress">0 reviews recorded locally</span><button id="export-audit" type="button">Export audit JSON</button></div></div>
           </header>
           <section class="benchmark-strip" id="control-summary" aria-label="Benchmark results">
-            <div class="benchmark-result naive"><strong>Agent recommendation only:</strong> <span><b id="naive-stopped">0</b> / <b id="naive-attack-total">0</b> payment attempts automatically stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-result naive"><strong>Autonomous agent baseline:</strong> <span><b id="naive-stopped">—</b> / <b id="naive-attack-total">0</b> risk cases stopped</span><div class="meter"><i></i></div></div>
             <div class="benchmark-divider"></div>
-            <div class="benchmark-result protected"><strong>Agent + enforced policy:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> payment attempts stopped</span><div class="meter"><i></i></div></div>
-            <p class="benchmark-note">Synthetic fixture benchmark. This chart measures automatic enforcement, not agent detection. Claude may recommend review, but only policy can stop release. Agent detection rate is not claimed until every fixture is evaluated.</p>
+            <div class="benchmark-result protected"><strong>Agent + enforced policy:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> risk cases stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-note"><span id="benchmark-note-text">Synthetic fixture benchmark.</span><button id="run-agent-benchmark" type="button">Re-run Claude baseline</button></div>
           </section>
           <section class="queue-tools" aria-label="Review queue controls">
             <div class="filters" role="toolbar" aria-label="Filter payment requests">
               <button class="active" data-filter="all">All risk signals <span id="all-count">0</span></button>
-              <button data-filter="attack">Fraud scenarios <span id="attack-count">0</span></button>
+              <button data-filter="attack">Risk scenarios <span id="attack-count">0</span></button>
               <button data-filter="clean">Clean payments <span id="clean-count">0</span></button>
               <button data-filter="exception">Exceptions <span id="exception-count">0</span></button>
             </div>
@@ -64,7 +64,7 @@
           </section>
         </section>
         <aside class="decision-panel" id="decision-panel" aria-live="polite">
-          <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare its naive and protected decision paths.</p></div>
+          <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare the autonomous-agent and enforced-policy paths.</p></div>
         </aside>
       </main>
       <dialog class="source-document-dialog" id="source-document-dialog" aria-labelledby="source-document-title">

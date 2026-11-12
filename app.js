@@ -1,10 +1,12 @@
 import { requests, scenarioLabels } from "./src/data.js";
+import { recordedAgentBenchmark } from "./src/agent-benchmark.js";
 import { metrics, runBenchmark } from "./src/risk-engine.js";
 
 let results = runBenchmark(requests);
 const firstRisk = results.find((result) => result.request.category === "bank_change");
 const savedReviews = (() => { try { return JSON.parse(localStorage.getItem("transfer-trust-reviews") ?? "{}"); } catch { return {}; } })();
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null };
+const savedAgentBenchmark = (() => { try { const saved = JSON.parse(localStorage.getItem("transfer-trust-agent-benchmark") ?? "null"); return Array.isArray(saved?.assessments) ? saved : null; } catch { return null; } })();
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null, agentBenchmark: savedAgentBenchmark ?? recordedAgentBenchmark, benchmarkingAgent: false };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
 const reviewProgress = document.querySelector("#review-progress");
@@ -24,10 +26,20 @@ function updateScenarioCounts() {
   document.querySelector("#attack-count").textContent = attackCount;
   document.querySelector("#clean-count").textContent = cleanCount;
   document.querySelector("#exception-count").textContent = exceptionCount;
-  document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
+  const agentDecisions = new Map(state.agentBenchmark?.assessments?.map((assessment) => [assessment.invoiceId, assessment]) ?? []);
+  const agentStopped = state.agentBenchmark ? results.filter((result) => classification(result) === "attack" && ["hold", "block"].includes(agentDecisions.get(result.request.invoiceId)?.decision)).length : null;
+  document.querySelector("#naive-stopped").textContent = agentStopped ?? "—";
   document.querySelector("#protected-stopped").textContent = metrics(results, "protected").stopped;
   document.querySelector("#naive-attack-total").textContent = attackCount;
   document.querySelector("#protected-attack-total").textContent = attackCount;
+  document.querySelector(".benchmark-result.naive .meter i").style.width = agentStopped == null ? "0%" : `${(agentStopped / attackCount) * 100}%`;
+  document.querySelector(".benchmark-result.protected .meter i").style.width = `${(metrics(results, "protected").stopped / attackCount) * 100}%`;
+  const benchmarkButton = document.querySelector("#run-agent-benchmark");
+  benchmarkButton.textContent = state.benchmarkingAgent ? "Evaluating Claude…" : state.agentBenchmark ? "Re-run Claude baseline" : "Evaluate Claude baseline";
+  benchmarkButton.disabled = state.benchmarkingAgent;
+  document.querySelector("#benchmark-note-text").textContent = state.agentBenchmark?.recorded
+    ? `Recorded ${state.agentBenchmark.evaluatedAt} · ${state.agentBenchmark.model} saw one document at a time, without trusted vendor, PO, history, or balance data. Policy may override before simulated release; no payment is executed.`
+    : "Live Claude evaluation · one document at a time without trusted vendor, PO, history, or balance data. Policy may override before simulated release; no payment is executed.";
 }
 
 function filteredResults() {
@@ -63,6 +75,10 @@ function documentForClaude(request) {
   return `Vendor: ${request.vendor}\nInvoice ID: ${request.invoiceId}\nRequested amount: ${currency(request.amount)}\nRequested destination: ${request.account}\nPurpose: ${request.note}${request.hiddenText ? `\nAdditional document text: ${request.hiddenText}` : ""}`;
 }
 
+function autonomousAgentDecision(request) {
+  return state.agentBenchmark?.assessments?.find((assessment) => assessment.invoiceId === request.invoiceId) ?? null;
+}
+
 function renderAiProposal(request) {
   const record = state.aiByInvoice[request.invoiceId];
   const loading = state.extractingInvoice === request.invoiceId;
@@ -75,7 +91,8 @@ function renderAiProposal(request) {
 }
 
 function renderPanel(result) {
-  const { request, naive, protected: protectedResult } = result;
+  const { request, protected: protectedResult } = result;
+  const agentBaseline = autonomousAgentDecision(request);
   const evidence = request.hiddenText || request.note;
   const localReview = state.reviews[request.invoiceId];
   const trace = traceFor(request, protectedResult).map(([label, status, tone]) => `<div class="trace-row ${tone}"><span>${label}</span><span>${status}</span></div>`).join("");
@@ -86,7 +103,7 @@ function renderPanel(result) {
     <div class="review-path"><div class="path-step">Document<br />screen</div><div class="path-step">Vendor<br />master</div><div class="path-step">Purchase<br />order</div><div class="path-step">Decision</div></div>
     <section class="case-section"><h3>Evidence</h3><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Document screen:</strong> ${evidence}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Vendor master:</strong> ${vendorAccount}.</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Purchase order:</strong> ${request.amount === request.expectedAmount ? "amount matches the approved purchase order." : "amount differs from the approved purchase order."}</div></div>${fundingEvidence}<div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Decision:</strong> ${protectedResult.reason}</div></div></section>
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
-    <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
+    <section class="explanation"><h3>Explanation</h3><p>${agentBaseline ? `The simulated autonomous agent would <b>${agentBaseline.decision}</b> this request: ${escapeHtml(agentBaseline.reason)}.` : "Evaluate the Claude baseline to see how an autonomous agent would decide this request."} TransferTrust independently applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
     ${renderAiProposal(request)}
     <section class="proof-section"><h3>Control trace</h3>${trace}</section>
@@ -142,6 +159,25 @@ async function runClaudeExtraction() {
     renderList();
   }
 }
+async function runAgentBenchmark() {
+  if (state.benchmarkingAgent) return;
+  state.benchmarkingAgent = true;
+  updateScenarioCounts();
+  const documents = results.filter((result) => classification(result) === "attack").map(({ request }) => ({ invoiceId: request.invoiceId, document: documentForClaude(request) }));
+  try {
+    const response = await fetch("/api/ai/benchmark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documents }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? "Claude benchmark failed.");
+    state.agentBenchmark = { ...payload, recorded: false, evaluatedAt: new Date().toISOString() };
+    localStorage.setItem("transfer-trust-agent-benchmark", JSON.stringify(state.agentBenchmark));
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Claude benchmark failed.");
+  } finally {
+    state.benchmarkingAgent = false;
+    updateScenarioCounts();
+    renderList();
+  }
+}
 const sourceDialog = document.querySelector("#source-document-dialog");
 const sourceDocumentContent = document.querySelector("#source-document-content");
 function openSourceDocument() {
@@ -158,6 +194,7 @@ document.querySelector("#export-audit").addEventListener("click", () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), reviews: report }, null, 2)], { type: "application/json" }));
   const link = document.createElement("a"); link.href = url; link.download = "transfer-trust-review-audit.json"; link.click(); URL.revokeObjectURL(url);
 });
+document.querySelector("#run-agent-benchmark").addEventListener("click", runAgentBenchmark);
 
 const sandboxStatus = document.querySelector("#plaid-status");
 const accountName = document.querySelector("#plaid-account-name");

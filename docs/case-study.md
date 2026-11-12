@@ -12,10 +12,10 @@ Run deterministic controls before release, expose the evidence for every outcome
 
 The project evaluates the same synthetic 30-request batch through two paths:
 
-- Naive path: 0 of 12 seeded attacks stopped.
+- Document-only Claude baseline: 3 of 12 fixed context-gap fixtures stopped in a recorded, one-document-at-a-time evaluation of `claude-haiku-4-5-20251001`.
 - Protected path: 12 of 12 seeded attacks stopped and 0 of 16 clean payments held.
 
-The batch is synthetic by design. These are test results, not a claim about real-world fraud performance.
+Claude has no vendor-master, PO, invoice-history, or balance access in that evaluation. The batch is synthetic by design. These are test results, not a claim about real-world fraud performance.
 
 ## Plaid's role
 
@@ -23,8 +23,8 @@ The app creates a Plaid Sandbox Item server-side and uses the connected Cash Man
 
 ## Demo workflow
 
-1. Select a fraud scenario to inspect its deterministic evidence trail.
-2. Open **View source document** to inspect the synthetic invoice text layer that the document screen evaluated.
+1. Select a context-gap scenario to inspect its deterministic evidence trail.
+2. Open **View source document** to inspect the clean-looking synthetic document that Claude saw without trusted context.
 3. Read the control trace, including the explicit “not initiated” release-action entry after a block or hold.
 4. Select **Insufficient funds** to see the connected Plaid Sandbox balance affect the result.
 5. Record a local operator acknowledgement; it persists in browser storage.
