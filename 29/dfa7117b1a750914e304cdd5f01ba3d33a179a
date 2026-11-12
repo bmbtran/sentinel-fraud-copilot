@@ -1,0 +1,21 @@
+app.js
+  s_0636dc79126953::t_f74175c60fd801 18-32,138-139,162
+index.html
+  s_0636dc79126953::t_f74175c60fd801 17-18,34,37,39,43-46,62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "29dfa7117b1a750914e304cdd5f01ba3d33a179a",
+  "prompts": {},
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
