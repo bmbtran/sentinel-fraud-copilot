@@ -1,0 +1,39 @@
+index.html
+  s_0b84c363e40fea::t_b78d291ccc3672 3
+  s_0b84c363e40fea::t_569af438af4e0c 2
+incident-ui.js
+  s_0b84c363e40fea::t_985b2a3123dbc7 1-3
+app.js
+  s_0b84c363e40fea::t_79ff0d18f777f1 14,16-17
+  s_0b84c363e40fea::t_fd3c21ef710fa7 23
+  s_0b84c363e40fea::t_952a33e3b993bf 4,10
+  s_0b84c363e40fea::t_600fefde73fc28 3,5-9,11-13,20,22,24
+  s_0b84c363e40fea::t_480240fe4b85af 21
+  s_0b84c363e40fea::t_985b2a3123dbc7 1,19
+  s_0b84c363e40fea::t_1d6694b7771fb3 15,18
+styles.css
+  s_0b84c363e40fea::t_aed8524562b493 1
+incident.css
+  s_0b84c363e40fea::t_569af438af4e0c 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e50f9edc2fa955d80c857554b35617a5d468f968",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
