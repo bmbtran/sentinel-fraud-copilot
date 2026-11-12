@@ -2,7 +2,7 @@
 
 **A transparent fraud-screening demo for payment-change requests.**
 
-TransferTrust tests a simple boundary: a document-only AI agent cannot verify facts it cannot see, while deterministic safeguards can compare a request with trusted records before release.
+Inspired by Plaid, TransferTrust tests a simple boundary: a document-only AI agent cannot verify facts it cannot see, while deterministic safeguards can compare a request with trusted records before release.
 
 ## The demo moment
 
