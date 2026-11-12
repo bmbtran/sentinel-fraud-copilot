@@ -19,4 +19,5 @@ test("Plaid funding context holds a request above available funds", () => {
   const decision = protectedDecision(request, undefined, { available: 12060 });
   assert.equal(decision.decision, "hold");
   assert.equal(decision.guard, "plaid-funding");
+  assert.deepEqual(metrics(runBenchmark(requests, { available: 12060 }), "protected"), { stopped: 12, attacks: 12, cleanHeld: 0, clean: 16 });
 });

@@ -1,0 +1,33 @@
+# TransferTrust: a constrained payment-review prototype
+
+## Problem
+
+Payment-change requests often arrive in documents that are not a trusted system of record. A reviewer needs to distinguish the invoice's claim from what a verified vendor record, purchase order, and funding account support.
+
+## Product hypothesis
+
+Run deterministic controls before release, expose the evidence for every outcome, and retain a lightweight local review record. This prototype tests whether those controls improve outcomes on a fixed adversarial batch.
+
+## Evidence
+
+The project evaluates the same synthetic 30-request batch through two paths:
+
+- Naive path: 0 of 12 seeded attacks stopped.
+- Protected path: 12 of 12 seeded attacks stopped and 0 of 16 clean payments held.
+
+The batch is synthetic by design. These are test results, not a claim about real-world fraud performance.
+
+## Plaid's role
+
+The app creates a Plaid Sandbox Item server-side and uses the connected Cash Management account's available balance as a funding-readiness control. A payment above that balance is held with the `plaid-funding` reason. Plaid does not determine whether an invoice is fraudulent; it supplies an account signal appropriate to its role.
+
+## Demo workflow
+
+1. Select a fraud scenario to inspect its deterministic evidence trail.
+2. Select **Insufficient funds** to see the connected Plaid Sandbox balance affect the result.
+3. Record a local operator acknowledgement; it persists in browser storage.
+4. Export the review audit JSON.
+
+## Intentional boundaries
+
+This is not a money-movement system. It has no production authentication, persistence, vendor-maintenance workflow, permissions, webhooks, or real customer data. The prototype is designed to make the decision boundary and tradeoffs inspectable.

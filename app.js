@@ -3,9 +3,11 @@ import { metrics, runBenchmark } from "./src/risk-engine.js";
 
 let results = runBenchmark(requests);
 const firstRisk = results.find((result) => result.request.category === "bank_change");
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null };
+const savedReviews = (() => { try { return JSON.parse(localStorage.getItem("transfer-trust-reviews") ?? "{}"); } catch { return {}; } })();
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
+const reviewProgress = document.querySelector("#review-progress");
 document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
 document.querySelector("#protected-stopped").textContent = metrics(results, "protected").stopped;
 
@@ -27,10 +29,13 @@ function filteredResults() {
 function statusClass(decision) { return decision === "block" ? "block" : decision === "hold" ? "hold" : "approve"; }
 function decisionLabel(decision) { return decision === "block" ? "Blocked" : decision === "hold" ? "Hold" : "Approved"; }
 function currency(value) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
+function saveReviews() { localStorage.setItem("transfer-trust-reviews", JSON.stringify(state.reviews)); }
+function updateReviewProgress() { reviewProgress.textContent = `${Object.keys(state.reviews).length} ${Object.keys(state.reviews).length === 1 ? "review" : "reviews"} recorded locally`; }
 
 function renderPanel(result) {
   const { request, naive, protected: protectedResult } = result;
   const evidence = request.hiddenText || request.note;
+  const localReview = state.reviews[request.invoiceId];
   const vendorAccount = request.vendorId === "northstar-spoof" ? "No verified vendor record" : request.account;
   const fundingEvidence = state.fundingAccount ? `<div class="evidence-row"><span class="evidence-icon">▥</span><div><strong>Plaid funding check:</strong> ${currency(state.fundingAccount.available)} available in ${state.fundingAccount.name}; ${request.amount > state.fundingAccount.available ? "payment exceeds available funds." : "payment fits within available funds."}</div></div>` : "";
   panel.innerHTML = `
@@ -40,6 +45,7 @@ function renderPanel(result) {
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
     <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
+    <div class="review-record"><p>${localReview ? `<strong>Review recorded</strong><br />${new Date(localReview.recordedAt).toLocaleString()}` : "No operator review recorded yet. This demo stores review acknowledgements locally in the browser."}</p><button class="review-button" type="button" data-review-action="${localReview ? "remove" : "record"}">${localReview ? "Remove local review" : `Record ${decisionLabel(protectedResult.decision)} review`}</button></div>
     <div class="audit-fields"><div><span>Requested account</span><b>${request.account}</b></div><div><span>Applied control</span><b>${protectedResult.guard ?? "none"}</b></div><div><span>Review mode</span><b>Deterministic demo</b></div></div>`;
 }
 
@@ -63,6 +69,18 @@ document.querySelector(".filters").addEventListener("click", (event) => {
 });
 document.querySelector("#filter-search").addEventListener("input", (event) => { state.search = event.target.value; renderList(); });
 list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
+panel.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-review-action]");
+  if (!button || !state.selected) return;
+  if (button.dataset.reviewAction === "remove") delete state.reviews[state.selected];
+  else state.reviews[state.selected] = { decision: results.find((result) => result.request.invoiceId === state.selected)?.protected.decision, recordedAt: new Date().toISOString() };
+  saveReviews(); updateReviewProgress(); renderList();
+});
+document.querySelector("#export-audit").addEventListener("click", () => {
+  const report = Object.entries(state.reviews).map(([invoiceId, review]) => ({ invoiceId, ...review }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), reviews: report }, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a"); link.href = url; link.download = "transfer-trust-review-audit.json"; link.click(); URL.revokeObjectURL(url);
+});
 
 const sandboxStatus = document.querySelector("#plaid-status");
 const accountName = document.querySelector("#plaid-account-name");
@@ -100,4 +118,5 @@ document.querySelector(".sidebar nav").addEventListener("click", (event) => {
 });
 
 renderList();
+updateReviewProgress();
 loadSandbox();
