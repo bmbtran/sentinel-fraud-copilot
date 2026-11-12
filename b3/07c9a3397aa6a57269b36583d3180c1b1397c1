@@ -1,0 +1,48 @@
+package.json
+  s_0b84c363e40fea::t_9fd278cc343492 2,6
+src/sentinel-core.js
+  s_0b84c363e40fea::t_ea330a5de879ab 19,21,30
+  s_0b84c363e40fea::t_811992bb00a9e8 27
+  s_0b84c363e40fea::t_e43fa674e70bd3 1-18,20,22-25,28
+  s_0b84c363e40fea::t_3d823412c0e250 29
+  s_0b84c363e40fea::t_2e11a36e57684d 26
+src/sentinel-data.js
+  s_0b84c363e40fea::t_9fd278cc343492 1-15,20,24
+  s_0b84c363e40fea::t_b78d291ccc3672 16-19,21-23
+src/sentinel-db.js
+  s_0b84c363e40fea::t_fe2dad2e5f9a69 18
+  s_0b84c363e40fea::t_e43fa674e70bd3 1-6,8-13,16-17
+  s_0b84c363e40fea::t_3d823412c0e250 7,15
+  s_0b84c363e40fea::t_aadd4935195ef2 14
+.gitignore
+  s_0b84c363e40fea::t_ec0594d36b638f 11-13
+tests/sentinel-core.test.mjs
+  s_0b84c363e40fea::t_8c33ae42cfb6fb 3-4,6-10,13-16,19-24
+server.mjs
+  s_0b84c363e40fea::t_8f6577a71de976 1,9,12-14,16,18,22-26,28,31-32
+  s_0b84c363e40fea::t_ea330a5de879ab 15
+  s_0b84c363e40fea::t_3d823412c0e250 6-7,29
+  s_0b84c363e40fea::t_fe2dad2e5f9a69 10,19,27
+  s_0b84c363e40fea::t_c7c045d0e99477 17,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b307c9a3397aa6a57269b36583d3180c1b1397c1",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
