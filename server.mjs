@@ -1,206 +1,56 @@
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { requests, vendorMaster } from "./src/data.js";
-import { protectedDecision } from "./src/risk-engine.js";
+import { paymentFixtures } from "./src/command-data.js";
+import { assessPayment, buildGraph, queueSummary } from "./src/risk-core.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
-const anthropicBaseUrl = "https://api.anthropic.com/v1/messages";
-const sandboxState = { accessToken: null, itemId: null, accounts: [], fundingAccount: null, transferAccount: null };
+const sandboxState = { accessToken: null, accounts: [], fundingAccount: null };
 const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript", ".svg": "image/svg+xml" };
+const paymentState = new Map(paymentFixtures.map((payment) => [payment.id, { reviewStatus: "OPEN", plaidAuthorization: null }]));
+const auditLog = [];
 
-function sendJson(response, status, body) {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-  response.end(JSON.stringify(body));
-}
+function sendJson(response, status, body) { response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); response.end(JSON.stringify(body)); }
+function credentials() { const { PLAID_CLIENT_ID: client_id, PLAID_SECRET: secret } = process.env; if (!client_id || !secret) throw new Error("Plaid Sandbox credentials are missing. Add them to .env."); return { client_id, secret }; }
+function hash(value) { return createHash("sha256").update(value).digest("hex"); }
+function audit(event, entityId, payload = {}) { const previousHash = auditLog.at(-1)?.hash ?? "GENESIS"; const entry = { id: `AUD-${randomUUID().slice(0, 8)}`, at: new Date().toISOString(), event, entityId, payload, previousHash }; entry.hash = hash(JSON.stringify(entry)); auditLog.push(entry); return entry; }
+function paymentById(id) { const payment = paymentFixtures.find((item) => item.id === id); if (!payment) throw new Error("Payment fixture was not found."); return payment; }
+function publicPayment(payment) { return { ...payment, assessment: assessPayment(payment), ...paymentState.get(payment.id) }; }
+function commandCenter() { return { summary: queueSummary(paymentFixtures), payments: paymentFixtures.map(publicPayment), graph: buildGraph(paymentFixtures), audit: auditLog.slice(-12).reverse() }; }
 
-function credentials() {
-  const { PLAID_CLIENT_ID: client_id, PLAID_SECRET: secret } = process.env;
-  if (!client_id || !secret) throw new Error("Plaid Sandbox credentials are missing. Copy .env.example to .env and add your keys.");
-  return { client_id, secret };
-}
-
-function claudeCredentials() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("Claude is not configured. Add ANTHROPIC_API_KEY to your local .env file.");
-  return apiKey;
-}
-
-function parseAgentBenchmark(text, expectedInvoiceIds) {
-  const normalized = text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, "");
-  const parsed = JSON.parse(normalized);
-  if (!Array.isArray(parsed.assessments)) throw new Error("Claude did not return benchmark assessments.");
-  const assessments = parsed.assessments.map((assessment) => ({
-    invoiceId: typeof assessment.invoiceId === "string" ? assessment.invoiceId : "",
-    decision: ["approve", "hold", "block"].includes(assessment.decision) ? assessment.decision : "",
-    reason: typeof assessment.reason === "string" ? assessment.reason : ""
-  }));
-  if (assessments.length !== expectedInvoiceIds.length || assessments.some((assessment) => !expectedInvoiceIds.includes(assessment.invoiceId) || !assessment.decision)) {
-    throw new Error("Claude returned incomplete benchmark assessments.");
-  }
-  return assessments;
-}
-
-async function evaluateAutonomousDocument({ invoiceId, document }) {
-  const response = await fetch(anthropicBaseUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": claudeCredentials(), "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: process.env.CLAUDE_MODEL ?? "claude-haiku-4-5-20251001",
-      max_tokens: 180,
-      temperature: 0,
-      system: "You are a simulated autonomous accounts-payable agent handling a fast payment queue. For each submitted payment document, select exactly one action: approve, hold, or block, and give a concise reason. In this benchmark, your decision is treated as the agent's simulated release decision. You have no vendor-master data, purchase orders, duplicate history, or account balances; decide from the submitted document alone. Return only valid JSON: {\"assessments\":[{\"invoiceId\":string,\"decision\":\"approve|hold|block\",\"reason\":string}]}",
-      messages: [{ role: "user", content: `<payment_document invoice_id=\"${invoiceId}\">\n${document}\n</payment_document>` }]
-    }),
-    signal: AbortSignal.timeout(30000)
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error?.message ?? `Claude benchmark failed (${response.status})`);
-  const text = payload.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("Claude did not return a benchmark result.");
-  try {
-    return { model: payload.model, assessment: parseAgentBenchmark(text, [invoiceId])[0] };
-  } catch (error) {
-    throw error instanceof Error ? error : new Error("Claude returned an invalid benchmark result.");
-  }
-}
-
-async function evaluateAutonomousAgent(documents) {
-  const assessments = [];
-  let model = null;
-  for (const document of documents) {
-    const result = await evaluateAutonomousDocument(document);
-    model ??= result.model;
-    assessments.push(result.assessment);
-  }
-  return { model, assessments };
-}
-
-async function plaidPost(path, body) {
-  const response = await fetch(`${plaidBaseUrl}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...credentials(), ...body })
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error_message ?? `Plaid request failed (${response.status})`);
-  return payload;
-}
-
+async function plaidPost(path, body) { const response = await fetch(`${plaidBaseUrl}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...credentials(), ...body }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error_message ?? `Plaid request failed (${response.status})`); return payload; }
 async function connectSandbox() {
-  if (!sandboxState.accessToken) {
-    const sandboxItem = await plaidPost("/sandbox/public_token/create", {
-      institution_id: "ins_109508",
-      initial_products: ["auth", "transactions", "transfer"],
-      options: { transactions: { days_requested: 30 } }
-    });
-    const exchange = await plaidPost("/item/public_token/exchange", { public_token: sandboxItem.public_token });
-    sandboxState.accessToken = exchange.access_token;
-    sandboxState.itemId = exchange.item_id;
-  }
-  const accounts = await plaidPost("/accounts/get", { access_token: sandboxState.accessToken });
-  sandboxState.accounts = accounts.accounts.map(({ account_id, name, mask, subtype, balances }) => ({
-    id: account_id, name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
-  }));
-  sandboxState.fundingAccount = sandboxState.accounts.find((account) => account.subtype === "cash management" || account.name === "Plaid Cash Management") ?? sandboxState.accounts.find((account) => account.available != null && account.available >= 10000) ?? null;
-  sandboxState.transferAccount = sandboxState.accounts.find((account) => ["checking", "savings"].includes(account.subtype)) ?? sandboxState.fundingAccount;
-  return {
-    connected: true,
-    fundingAccount: sandboxState.fundingAccount
-  };
+  if (!sandboxState.accessToken) { const token = await plaidPost("/sandbox/public_token/create", { institution_id: "ins_109508", initial_products: ["auth", "transactions", "transfer"], options: { transactions: { days_requested: 30 } } }); const exchange = await plaidPost("/item/public_token/exchange", { public_token: token.public_token }); sandboxState.accessToken = exchange.access_token; }
+  const result = await plaidPost("/accounts/get", { access_token: sandboxState.accessToken });
+  sandboxState.accounts = result.accounts.map(({ account_id, name, mask, subtype, balances }) => ({ id: account_id, name, mask, subtype, available: balances.available, current: balances.current, isoCurrencyCode: balances.iso_currency_code }));
+  sandboxState.fundingAccount = sandboxState.accounts.find((account) => account.name === "Plaid Cash Management" || account.subtype === "cash management") ?? sandboxState.accounts.find((account) => account.available != null) ?? null;
+  return sandboxState.fundingAccount;
 }
-
-async function createTransferPreflight(invoiceId) {
-  const request = requests.find((item) => item.invoiceId === invoiceId);
-  if (!request) throw new Error("Fixture request was not found.");
-  await connectSandbox();
-  const policy = protectedDecision(request, vendorMaster, sandboxState.fundingAccount);
-  if (policy.decision !== "approve") throw new Error(`Transfer preflight is locked: policy decision is ${policy.decision}.`);
-  const transferAccount = sandboxState.fundingAccount ?? sandboxState.transferAccount;
-  if (!transferAccount?.id) throw new Error("No Sandbox account is available for a Transfer preflight.");
-  const response = await plaidPost("/transfer/authorization/create", {
-    access_token: sandboxState.accessToken,
-    account_id: transferAccount.id,
-    type: "debit",
-    network: "ach",
-    ach_class: "ppd",
-    amount: request.amount.toFixed(2),
-    user: { legal_name: "TransferTrust Sandbox Operator" },
-    idempotency_key: `fixture-${invoiceId.toLowerCase()}-${transferAccount.id}`
-  });
-  return {
-    invoiceId,
-    account: { name: transferAccount.name, mask: transferAccount.mask },
-    authorization: {
-      id: response.authorization?.id,
-      decision: response.authorization?.decision,
-      rationale: response.authorization?.decision_rationale?.code ?? null,
-      created: response.authorization?.created
-    },
-    transferCreated: false
-  };
+async function authorizeWithPlaid(payment) {
+  const assessment = assessPayment(payment); if (assessment.decision !== "READY_FOR_AUTHORIZATION") throw new Error("Only a low-risk payment can reach the Plaid authorization boundary.");
+  const account = await connectSandbox(); if (!account?.id) throw new Error("No linked Plaid Sandbox funding account is available.");
+  const result = await plaidPost("/transfer/authorization/create", { access_token: sandboxState.accessToken, account_id: account.id, type: "debit", network: "ach", ach_class: "ppd", amount: payment.amount.toFixed(2), user: { legal_name: "TransferTrust Sandbox Operator" }, idempotency_key: `command-${payment.id.toLowerCase()}-${account.id}` });
+  const authorization = { id: result.authorization?.id, decision: result.authorization?.decision, rationale: result.authorization?.decision_rationale?.code ?? null, account: { name: account.name, mask: account.mask }, transferCreated: false };
+  paymentState.get(payment.id).plaidAuthorization = authorization; audit("PLAID_TRANSFER_AUTHORIZATION", payment.id, { decision: authorization.decision, authorizationId: authorization.id }); return authorization;
 }
+async function readBody(request) { let body = ""; for await (const chunk of request) { body += chunk; if (body.length > 3000) throw new Error("Request body is too large."); } return body ? JSON.parse(body) : {}; }
+async function serveStatic(request, response) { const rawPath = request.url === "/" ? "/index.html" : decodeURIComponent(request.url.split("?")[0]); const filePath = normalize(join(root, rawPath)); if (!filePath.startsWith(root)) return sendJson(response, 403, { error: "Forbidden" }); try { const info = await stat(filePath); if (!info.isFile()) return sendJson(response, 404, { error: "Not found" }); response.writeHead(200, { "Content-Type": `${contentTypes[extname(filePath)] ?? "application/octet-stream"}; charset=utf-8` }); createReadStream(filePath).pipe(response); } catch { sendJson(response, 404, { error: "Not found" }); } }
 
-async function serveStatic(request, response) {
-  const rawPath = request.url === "/" ? "/index.html" : decodeURIComponent(request.url.split("?")[0]);
-  const filePath = normalize(join(root, rawPath));
-  if (!filePath.startsWith(root)) return sendJson(response, 403, { error: "Forbidden" });
-  try {
-    const info = await stat(filePath);
-    if (!info.isFile()) return sendJson(response, 404, { error: "Not found" });
-    response.writeHead(200, { "Content-Type": `${contentTypes[extname(filePath)] ?? "application/octet-stream"}; charset=utf-8` });
-    createReadStream(filePath).pipe(response);
-  } catch {
-    sendJson(response, 404, { error: "Not found" });
-  }
-}
-
+audit("COMMAND_CENTER_STARTED", "system", { mode: "sandbox" });
 createServer(async (request, response) => {
-  if (request.method === "GET" && request.url === "/api/plaid/status") {
-    try {
-      sendJson(response, 200, { environment: "sandbox", ...(await connectSandbox()) });
-    } catch (error) {
-      sendJson(response, 500, { environment: "sandbox", connected: false, error: error instanceof Error ? error.message : "Could not connect to Plaid Sandbox" });
-    }
-    return;
-  }
-  if (request.method === "POST" && request.url === "/api/plaid/transfer-preflight") {
-    let body = "";
-    request.setEncoding("utf8");
-    request.on("data", (chunk) => { body += chunk; if (body.length > 1000) request.destroy(); });
-    request.on("end", async () => {
-      try {
-        const { invoiceId } = JSON.parse(body);
-        if (typeof invoiceId !== "string") throw new Error("A fixture invoice ID is required.");
-        sendJson(response, 200, await createTransferPreflight(invoiceId));
-      } catch (error) {
-        sendJson(response, 400, { error: error instanceof Error ? error.message : "Plaid Transfer preflight failed" });
-      }
-    });
-    return;
-  }
-  if (request.method === "POST" && request.url === "/api/ai/benchmark") {
-    let body = "";
-    request.setEncoding("utf8");
-    request.on("data", (chunk) => {
-      body += chunk;
-      if (body.length > 20000) request.destroy();
-    });
-    request.on("end", async () => {
-      try {
-        const { documents } = JSON.parse(body);
-        if (!Array.isArray(documents) || documents.length < 1 || documents.length > 16 || documents.some((item) => typeof item?.invoiceId !== "string" || typeof item?.document !== "string" || !item.document.trim() || item.document.length > 2000)) throw new Error("A small, valid benchmark document set is required.");
-        sendJson(response, 200, await evaluateAutonomousAgent(documents));
-      } catch (error) {
-        sendJson(response, 400, { error: error instanceof Error ? error.message : "Could not evaluate the autonomous agent" });
-      }
-    });
-    return;
-  }
-  if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed" });
-  await serveStatic(request, response);
-}).listen(port, "127.0.0.1", () => console.log(`TransferTrust running at http://127.0.0.1:${port}`));
+  try {
+    if (request.method === "GET" && request.url === "/api/command-center") return sendJson(response, 200, commandCenter());
+    if (request.method === "GET" && request.url === "/api/plaid/status") { const account = await connectSandbox(); return sendJson(response, 200, { environment: "sandbox", connected: true, fundingAccount: account }); }
+    const authorizeMatch = request.url?.match(/^\/api\/payments\/([^/]+)\/authorize$/);
+    if (request.method === "POST" && authorizeMatch) { const payment = paymentById(authorizeMatch[1]); return sendJson(response, 200, { authorization: await authorizeWithPlaid(payment), payment: publicPayment(payment) }); }
+    const reviewMatch = request.url?.match(/^\/api\/payments\/([^/]+)\/review$/);
+    if (request.method === "POST" && reviewMatch) { const payment = paymentById(reviewMatch[1]); const { action, note = "" } = await readBody(request); if (!["HOLD", "REJECT", "ESCALATE"].includes(action)) throw new Error("Review action is invalid."); paymentState.get(payment.id).reviewStatus = action; audit(`REVIEW_${action}`, payment.id, { note: String(note).slice(0, 180) }); return sendJson(response, 200, { payment: publicPayment(payment), audit: auditLog.at(-1) }); }
+    if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed" });
+    return serveStatic(request, response);
+  } catch (error) { sendJson(response, 400, { error: error instanceof Error ? error.message : "Unexpected command-center error" }); }
+}).listen(port, "127.0.0.1", () => console.log(`TransferTrust command center running at http://127.0.0.1:${port}`));

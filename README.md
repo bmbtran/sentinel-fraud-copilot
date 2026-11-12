@@ -1,55 +1,35 @@
 # TransferTrust
 
-**A transparent fraud-screening guardrail for payment-change requests.**
+**A Plaid Sandbox payment-risk command center.**
 
-Inspired by Plaid, TransferTrust tests a simple boundary: a document-only AI agent cannot verify facts it cannot see, while deterministic safeguards can compare a request with trusted records before release.
+TransferTrust is an original portfolio prototype that puts a transparent risk decision in front of a Plaid Transfer authorization. It does not create transfers or move money.
 
-## The demo moment
+## The demo
 
-| Flow | Fraud attempts stopped | Legitimate payments incorrectly held |
-| --- | ---: | ---: |
-| Document-only Claude baseline | 3 / 12 | Not evaluated in this fixture run |
-| TransferTrust controls | 12 / 12 | 0 / 16 |
+1. A synthetic payment enters a command-center stream.
+2. A transparent rules engine scores device sharing, destination fan-in, transaction velocity, and amount signals.
+3. The operator can compare a recorded **Claude document-only** baseline with **Claude plus deterministic evidence rules** on a fixed 12-case adversarial suite: 3/12 versus 12/12 cases stopped.
+4. Only a low-risk fixture may call Plaid Sandbox's Transfer authorization endpoint.
+5. Holds, escalations, and Plaid authorizations append a hash-linked audit event. Transfer creation is intentionally unavailable.
 
-The Claude score is a recorded evaluation of `claude-haiku-4-5-20251001` on a fixed synthetic fixture set, one document at a time and without vendor-master, PO, history, or balance data. The data is synthetic and the controls are illustrative. This is not a real payment processor or fraud-prevention system.
+## Why Plaid is central
 
-## What it demonstrates
+Plaid is the authorization boundary, not a decorative account card. The app retrieves a server-side Sandbox funding account and calls `/transfer/authorization/create` only after its risk policy returns `READY_FOR_AUTHORIZATION`. The browser never receives a Plaid access token or secret.
 
-- A seeded adversarial payment-request dataset
-- A document-only Claude baseline used for the comparison
-- Deterministic pre-transfer risk checks
-- A vendor-master policy that prevents invoice text from changing payout details
-- An explainable audit trail for each decision
-- A side-by-side before/after benchmark
-- A server-side Plaid Sandbox funding-readiness check using a live test-account balance
-- A Plaid Transfer Sandbox authorization preflight on policy-approved fixtures
+This is a Sandbox-only portfolio demo. A Plaid authorization assesses the linked funding source and ACH authorization; it does not validate a merchant or prove fraud detection is production-ready.
 
-## Development
-
-This project deliberately uses a dependency-free static dashboard so the demo can run anywhere:
+## Run locally
 
 ```powershell
 npm start
 ```
 
-Then open `http://localhost:4173`.
-
-Run the deterministic benchmark tests with:
+Open `http://127.0.0.1:4173`. To use the live Sandbox authorization path, add Plaid Sandbox credentials to `.env` using `.env.example` as a guide.
 
 ```powershell
 npm test
 ```
 
-### Claude (optional)
+## Architecture inspiration and attribution
 
-Add `ANTHROPIC_API_KEY` to local `.env`. Claude is called server-side only. The dashboard can show a recorded fixture evaluation or re-run the document-only autonomous-agent baseline; both are simulated decisions and cannot execute a payment.
-
-### Plaid Sandbox (optional)
-
-Copy `.env.example` to `.env` and add a Plaid Sandbox client ID and secret. The local server uses `/sandbox/public_token/create` to create a test Item and `/accounts/get` to retrieve test account context. Credentials and the returned access token remain server-side and are never exposed to the browser.
-
-This integration does **not** initiate transfers. It uses the connected Sandbox account's available balance as a funding-readiness control: a request above available funds is held before release. For a fixture that the local policy approves, the dashboard can also call Plaid's Transfer authorization endpoint as an ACH risk preflight and display Plaid's authorization decision. The transfer-creation endpoint is intentionally absent, so the demo never creates a transfer or moves money. Fraud decisions remain deterministic and testable, while Plaid provides a live operational decision at the release boundary.
-
-## Design note
-
-TransferTrust is a clean-room portfolio project inspired by the general idea of measuring controls against a fixed adversarial test set. Its implementation, data, and interface are original.
+The project was rethought after studying the high-level architecture of [Sentinel](https://github.com/Tanisha-dey18/hackathon), an MIT-licensed PayPal hackathon project: a payment-state boundary, evidence-led risk assessment, operator review, relationship intelligence, and auditability. TransferTrust is a clean-room Plaid-oriented implementation: its code, UI, fixtures, risk rules, and terminology were written independently and it does not copy Sentinel source files.

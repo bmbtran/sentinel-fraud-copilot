@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="TransferTrust payment-change fraud screening demo" />
-    <title>TransferTrust — payment change review</title>
+    <meta name="description" content="Plaid Sandbox payment-risk command center" />
+    <title>TransferTrust — Plaid risk command center</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,90 +12,10 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <a class="brand" href="#review-queue">TransferTrust<span>.</span></a>
-        <span class="env-tag">Plaid Sandbox</span>
-        <span class="run-id">FIXTURE BATCH F-01</span>
-      </header>
-      <aside class="sidebar" aria-label="Product navigation">
-        <nav>
-          <button class="active" data-nav="queue"><span class="nav-icon">▤</span>Review queue</button>
-          <button data-nav="root-cause"><span class="nav-icon">◎</span>Root cause</button>
-          <button data-nav="agent-trust"><span class="nav-icon">◒</span>Agent trust</button>
-          <button data-nav="guardrails"><span class="nav-icon">◈</span>Guardrails</button>
-          <button data-nav="alerts"><span class="nav-icon">△</span>Alert intelligence</button>
-        </nav>
-        <div class="sidebar-foot"><span class="live-dot"></span>Demo mode · read only</div>
-      </aside>
-      <main class="workspace" id="review-queue">
-        <section class="queue-area">
-          <header class="queue-header">
-            <p class="section-kicker">OPERATIONS · PAYMENT CONTROLS</p>
-            <div class="title-row"><div><h1>Payment change review</h1><p>Fixture batch F-01 · <span id="batch-count">0</span> requests awaiting operator review</p></div><div class="run-tools"><span id="review-progress">0 reviews recorded locally</span><button id="export-audit" type="button">Export audit JSON</button></div></div>
-          </header>
-          <section class="benchmark-strip" id="control-summary" aria-label="Benchmark results">
-            <div class="benchmark-result naive"><strong>Autonomous agent baseline:</strong> <span><b id="naive-stopped">—</b> / <b id="naive-attack-total">0</b> risk cases stopped</span><div class="meter"><i></i></div></div>
-            <div class="benchmark-divider"></div>
-            <div class="benchmark-result protected"><strong>Agent + enforced policy:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> risk cases stopped</span><div class="meter"><i></i></div></div>
-            <div class="benchmark-note"><span id="benchmark-note-text">Synthetic fixture benchmark.</span><button id="run-agent-benchmark" type="button">Re-run Claude baseline</button></div>
-          </section>
-          <section class="queue-tools" aria-label="Review queue controls">
-            <div class="filters" role="toolbar" aria-label="Filter payment requests">
-              <button class="active" data-filter="all">All risk signals <span id="all-count">0</span></button>
-              <button data-filter="attack">Risk scenarios <span id="attack-count">0</span></button>
-              <button data-filter="clean">Clean payments <span id="clean-count">0</span></button>
-              <button data-filter="exception">Exceptions <span id="exception-count">0</span></button>
-            </div>
-            <label class="search"><span>⌕</span><input id="filter-search" type="search" placeholder="Search vendor, invoice, or account…" /></label>
-          </section>
-          <section class="queue-table" aria-label="Payment request queue">
-            <div class="table-labels" aria-hidden="true"><span>Vendor</span><span>Invoice ID</span><span>Requested account</span><span>Amount</span><span>Risk signal</span><span>Decision</span></div>
-            <div class="request-list" id="request-list"></div>
-          </section>
-          <section class="sandbox-context" id="sandbox-context" aria-labelledby="sandbox-title">
-            <div class="sandbox-heading"><h2 id="sandbox-title"><span>▥</span> Plaid Sandbox funding context</h2><span class="test-data">Used in review</span></div>
-            <div class="sandbox-content" aria-live="polite">
-              <div><span>Linked account</span><strong id="plaid-account-name">No test account linked</strong></div>
-              <div><span>Account ending</span><strong id="plaid-account-ending">••••</strong></div>
-              <div><span>Available balance</span><strong id="plaid-account-balance">—</strong></div>
-              <div><span>Status</span><strong class="connection-status" id="plaid-status"><i></i>connecting</strong></div>
-            </div>
-            <p class="sandbox-detail" id="plaid-account-detail">The review checks whether the selected payment fits within the current Plaid Sandbox balance.</p>
-          </section>
-        </section>
-        <aside class="decision-panel" id="decision-panel" aria-live="polite">
-          <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare the autonomous-agent and enforced-policy paths.</p></div>
-        </aside>
-        <section class="operations-page" id="root-cause-page" hidden aria-labelledby="root-cause-title">
-          <header class="operations-header"><div><p class="section-kicker">ANALYSIS · FIXTURE BATCH F-01</p><h1 id="root-cause-title">Root cause</h1><p>Group stopped requests by the trusted control that disagreed with the document-only agent.</p></div><button class="secondary-action" type="button" data-refresh-root>Refresh analysis</button></header>
-          <section class="root-summary"><div><span>Open clusters</span><strong id="root-cluster-count">0</strong></div><div><span>Risk cases</span><strong id="root-risk-count">0</strong></div><div><span>Agent approvals</span><strong id="root-agent-approvals">0</strong></div><div><span>Policy stops</span><strong id="root-policy-stops">0</strong></div></section>
-          <section class="root-callout"><p class="section-kicker">CONTROL SUMMARY</p><h2 id="root-summary-title">Trusted records close the verification gap.</h2><p id="root-summary-text"></p><p class="analysis-time" id="root-refreshed-at"></p></section>
-          <div class="root-grid" id="root-clusters"></div>
-        </section>
-        <section class="operations-page" id="guardrails-page" hidden aria-labelledby="guardrails-title">
-          <header class="operations-header"><div><p class="section-kicker">PROTECT · ENFORCEMENT</p><h1 id="guardrails-title">Guardrails</h1><p>Turn controls on or off to see their real effect on this fixture batch. Changes stay in this browser.</p></div><button class="secondary-action" type="button" data-reset-controls>Restore recommended controls</button></header>
-          <section class="guardrail-overview" id="guardrail-overview"></section>
-          <section class="rule-panel"><div class="rule-panel-head"><div><p class="section-kicker">RULE CONFIGURATION</p><h2>Active controls</h2></div><p id="guardrail-status">Loading controls…</p></div><div id="guardrail-rules"></div></section>
-          <section class="enforcement-panel"><p class="section-kicker">ENFORCEMENT CHECK</p><div id="enforcement-check"></div></section>
-        </section>
-        <section class="operations-page" id="agent-trust-page" hidden aria-labelledby="agent-trust-title">
-          <header class="operations-header"><div><p class="section-kicker">GOVERN · AGENT RELEASE READINESS</p><h1 id="agent-trust-title">Agent trust score</h1><p>A transparent readiness score for this payment workflow. It measures observed decisions and evidence access—not a person’s financial creditworthiness.</p></div><button class="secondary-action" type="button" data-recalculate-trust>Recalculate from Claude baseline</button></header>
-          <section class="trust-hero" id="trust-hero"></section>
-          <section class="trust-breakdown" id="trust-breakdown"></section>
-          <section class="trust-policy"><p class="section-kicker">RELEASE POLICY</p><h2 id="trust-policy-title"></h2><p id="trust-policy-copy"></p><button class="secondary-action" type="button" data-open-trust-case>Inspect a disagreement</button></section>
-        </section>
-        <section class="operations-page" id="alerts-page" hidden aria-labelledby="alerts-title">
-          <header class="operations-header"><div><p class="section-kicker">PROTECT · OPERATOR QUEUE</p><h1 id="alerts-title">Alert intelligence</h1><p>Prioritize repeated control failures, inspect a representative case, then resolve or dismiss the local alert.</p></div><button class="secondary-action" type="button" data-reset-alerts>Restore fixture alerts</button></header>
-          <section class="alert-metrics" id="alert-metrics"></section>
-          <section class="alert-section"><div class="rule-panel-head"><div><p class="section-kicker">REQUIRES ATTENTION</p><h2>Open alerts</h2></div></div><div id="open-alerts"></div></section>
-          <section class="alert-section"><div class="rule-panel-head"><div><p class="section-kicker">RECENTLY RESOLVED</p><h2>Closed alerts</h2></div></div><div id="closed-alerts"></div></section>
-        </section>
-      </main>
-      <dialog class="source-document-dialog" id="source-document-dialog" aria-labelledby="source-document-title">
-        <div class="document-modal-head"><div><p class="section-kicker">EXTRACTED DOCUMENT VIEW</p><h2 id="source-document-title">Invoice source</h2></div><button class="modal-close" type="button" data-close-document aria-label="Close document">×</button></div>
-        <div id="source-document-content"></div>
-      </dialog>
+    <div class="shell">
+      <header><a href="#command" class="brand">TransferTrust<span>•</span></a><span class="environment">PLAID SANDBOX</span><span class="header-copy">risk-gated ACH authorization</span><span id="connection" class="connection">Connecting Plaid…</span></header>
+      <aside><p class="nav-label">OPERATIONS</p><nav><button data-view="command" class="active">Command center</button><button data-view="queue">Payment queue</button><button data-view="graph">Relationship graph</button><button data-view="audit">Audit trail</button></nav><div class="sidebar-note"><b>Demo safety</b><span>Authorization only. Transfer creation is disabled.</span></div></aside>
+      <main id="app" aria-live="polite"><div class="loading">Loading risk command center…</div></main>
     </div>
     <script type="module" src="app.js"></script>
   </body>
