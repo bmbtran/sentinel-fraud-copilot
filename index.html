@@ -34,10 +34,10 @@
             <div class="title-row"><div><h1>Payment change review</h1><p>Fixture batch F-01 · <span id="batch-count">0</span> requests awaiting operator review</p></div><div class="run-tools"><span id="review-progress">0 reviews recorded locally</span><button id="export-audit" type="button">Export audit JSON</button></div></div>
           </header>
           <section class="benchmark-strip" id="control-summary" aria-label="Benchmark results">
-            <div class="benchmark-result naive"><strong>AI proposal → auto-release:</strong> <span><b id="naive-stopped">0</b> / <b id="naive-attack-total">0</b> attacks stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-result naive"><strong>Agent recommendation only:</strong> <span><b id="naive-stopped">0</b> / <b id="naive-attack-total">0</b> payment attempts automatically stopped</span><div class="meter"><i></i></div></div>
             <div class="benchmark-divider"></div>
-            <div class="benchmark-result protected"><strong>AI proposal → enforced policy:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> attacks stopped</span><div class="meter"><i></i></div></div>
-            <p class="benchmark-note">Synthetic fixture benchmark. The auto-release baseline accepts every agent proposal without checks; enforced policy independently rechecks the source document and verified records.</p>
+            <div class="benchmark-result protected"><strong>Agent + enforced policy:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> payment attempts stopped</span><div class="meter"><i></i></div></div>
+            <p class="benchmark-note">Synthetic fixture benchmark. This chart measures automatic enforcement, not agent detection. Claude may recommend review, but only policy can stop release. Agent detection rate is not claimed until every fixture is evaluated.</p>
           </section>
           <section class="queue-tools" aria-label="Review queue controls">
             <div class="filters" role="toolbar" aria-label="Filter payment requests">
