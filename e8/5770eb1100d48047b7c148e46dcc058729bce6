@@ -1,0 +1,26 @@
+badge.css
+  s_0b84c363e40fea::t_2d2be2bd81c0d4 1
+index.html
+  s_0b84c363e40fea::t_2d2be2bd81c0d4 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e85770eb1100d48047b7c148e46dcc058729bce6",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
