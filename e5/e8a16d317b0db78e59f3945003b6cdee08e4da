@@ -1,0 +1,36 @@
+src/risk-engine.js
+  s_0636dc79126953::t_d6047914444e5e 13,21,25-26,30
+index.html
+  s_0636dc79126953::t_d6047914444e5e 57,64
+server.mjs
+  s_0636dc79126953::t_d6047914444e5e 10,53
+  s_0636dc79126953::t_83b0c47547dd2e 50
+docs/interview-demo.md
+  s_0636dc79126953::t_aa980450e02756 16,25
+styles.css
+  s_0636dc79126953::t_83b0c47547dd2e 13-22
+app.js
+  s_0636dc79126953::t_fbd3e5be81ce29 4,6,10,14,35,39,74-76,79-80
+tests/risk-engine.test.mjs
+  s_0636dc79126953::t_d6047914444e5e 16-22
+README.md
+  s_0636dc79126953::t_aa980450e02756 23,45
+src/data.js
+  s_0636dc79126953::t_d6047914444e5e 42,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e5e8a16d317b0db78e59f3945003b6cdee08e4da",
+  "prompts": {},
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
