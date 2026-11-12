@@ -20,7 +20,7 @@ The data is synthetic and the controls are illustrative. This is not a real paym
 - A vendor-master policy that prevents invoice text from changing payout details
 - An explainable audit trail for each decision
 - A side-by-side before/after benchmark
-- An optional server-side Plaid Sandbox connection for test account context
+- A server-side Plaid Sandbox funding-readiness check using a live test-account balance
 
 ## Development
 
@@ -42,7 +42,7 @@ npm test
 
 Copy `.env.example` to `.env` and add a Plaid Sandbox client ID and secret. The local server uses `/sandbox/public_token/create` to create a test Item and `/accounts/get` to retrieve test account context. Credentials and the returned access token remain server-side and are never exposed to the browser.
 
-This integration does **not** initiate transfers or use bank data to make the fraud decisions. It illustrates a deliberately narrow integration boundary: Plaid account context can enrich a review experience, while the demonstrable fraud controls remain deterministic and testable.
+This integration does **not** initiate transfers. It uses the connected Sandbox account's available balance as a funding-readiness control: a request above available funds is held before release. Fraud decisions remain deterministic and testable, while Plaid provides a live balance snapshot for a distinct operational constraint.
 
 ## Design note
 

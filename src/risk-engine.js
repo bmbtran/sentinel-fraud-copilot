@@ -10,7 +10,7 @@ export function naiveDecision(request) {
   return { decision: "approve", reason: "Invoice details accepted" };
 }
 
-export function protectedDecision(request, master = vendorMaster) {
+export function protectedDecision(request, master = vendorMaster, fundingAccount = null) {
   if (request.hiddenText) return { decision: "block", reason: "Document contains an instruction to override payment controls", guard: "input-screen" };
   if (PII_PATTERN.test(request.note)) return { decision: "block", reason: "Sensitive identifier detected in payment context", guard: "sensitive-data" };
   if (BANK_CHANGE_PATTERN.test(request.note)) return { decision: "block", reason: "Bank changes cannot originate in an invoice", guard: "vendor-master" };
@@ -18,15 +18,16 @@ export function protectedDecision(request, master = vendorMaster) {
   if (request.account !== master[request.vendorId].account) return { decision: "block", reason: "Requested payout account differs from the vendor master", guard: "vendor-master" };
   if (request.amount !== request.expectedAmount) return { decision: "hold", reason: "Amount differs from the approved purchase order", guard: "purchase-order" };
   if (request.category === "duplicate") return { decision: "hold", reason: "Invoice already appears in payment history", guard: "duplicate-check" };
+  if (fundingAccount && request.amount > fundingAccount.available) return { decision: "hold", reason: "Available funds in the connected account are below the payment amount", guard: "plaid-funding" };
   return { decision: "approve", reason: "Verified against vendor master and purchase order", guard: "verified" };
 }
 
-export function runBenchmark(items) {
-  return items.map((request) => ({ request, naive: naiveDecision(request), protected: protectedDecision(request) }));
+export function runBenchmark(items, fundingAccount = null) {
+  return items.map((request) => ({ request, naive: naiveDecision(request), protected: protectedDecision(request, vendorMaster, fundingAccount) }));
 }
 
 export function metrics(results, version) {
-  const attacks = results.filter(({ request }) => request.category !== "clean" && !["amount_mismatch", "duplicate"].includes(request.category));
+  const attacks = results.filter(({ request }) => request.category !== "clean" && !["insufficient_funds", "duplicate"].includes(request.category));
   const cleanItems = results.filter(({ request }) => request.category === "clean");
   return {
     stopped: attacks.filter((result) => result[version].decision !== "approve").length,

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
-const sandboxState = { accessToken: null, itemId: null, accounts: [] };
+const sandboxState = { accessToken: null, itemId: null, accounts: [], fundingAccount: null };
 const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript" };
 
 function sendJson(response, status, body) {
@@ -47,9 +47,10 @@ async function connectSandbox() {
   sandboxState.accounts = accounts.accounts.map(({ name, mask, subtype, balances }) => ({
     name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
   }));
+  sandboxState.fundingAccount = sandboxState.accounts.find((account) => account.subtype === "cash management" || account.name === "Plaid Cash Management") ?? sandboxState.accounts.find((account) => account.available != null && account.available >= 10000) ?? null;
   return {
     connected: true,
-    accounts: sandboxState.accounts
+    fundingAccount: sandboxState.fundingAccount
   };
 }
 

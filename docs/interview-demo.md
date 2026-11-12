@@ -13,6 +13,7 @@ Clarify that all requests and vendors are synthetic. The point is the engineerin
 3. Open a **bank-change request**. Explain the key boundary: invoice text cannot update payout details. Only the vendor master is authoritative.
 4. Open a **look-alike vendor**. The text screen cannot reliably identify a visually similar name; the structural vendor-master match instead holds it for review. This is the deliberately honest limitation in the demo.
 5. Filter to **clean payments**. The protected result keeps all 16 moving, showing that the project is not simply a “block everything” rule.
+6. Open the **insufficient-funds** exception. Explain that the Plaid Sandbox funding source contributes a live available-balance snapshot; this request is held because its amount exceeds the connected account's available funds.
 
 ## Engineering decisions to highlight
 
@@ -21,7 +22,7 @@ Clarify that all requests and vendors are synthetic. The point is the engineerin
 - **Fixed benchmark.** The result is reproducible and tested rather than a hand-picked dashboard statistic.
 - **Explainability.** Every blocked, held, and approved item exposes the applied control and reason.
 - **Fail-safe behavior.** The vendor master is the source of truth whenever an invoice conflicts with it.
-- **Narrow Plaid boundary.** The Sandbox integration fetches test account context server-side, but it does not authorize, initiate, or simulate money movement. That keeps the API usage relevant without overstating the prototype's safety guarantees.
+- **Plaid as an operational input.** The Sandbox integration fetches a funding source's available balance server-side and applies it as a deterministic funding-readiness hold. It does not authorize, initiate, or simulate money movement.
 
 ## Architecture
 

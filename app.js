@@ -1,19 +1,17 @@
 import { requests, scenarioLabels } from "./src/data.js";
 import { metrics, runBenchmark } from "./src/risk-engine.js";
 
-const results = runBenchmark(requests);
+let results = runBenchmark(requests);
 const firstRisk = results.find((result) => result.request.category === "bank_change");
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null };
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
-const protectedMetrics = metrics(results, "protected");
-
 document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
-document.querySelector("#protected-stopped").textContent = protectedMetrics.stopped;
+document.querySelector("#protected-stopped").textContent = metrics(results, "protected").stopped;
 
 function classification(result) {
   if (result.request.category === "clean") return "clean";
-  if (["amount_mismatch", "duplicate"].includes(result.request.category)) return "exception";
+  if (["insufficient_funds", "duplicate"].includes(result.request.category)) return "exception";
   return "attack";
 }
 
@@ -34,10 +32,11 @@ function renderPanel(result) {
   const { request, naive, protected: protectedResult } = result;
   const evidence = request.hiddenText || request.note;
   const vendorAccount = request.vendorId === "northstar-spoof" ? "No verified vendor record" : request.account;
+  const fundingEvidence = state.fundingAccount ? `<div class="evidence-row"><span class="evidence-icon">▥</span><div><strong>Plaid funding check:</strong> ${currency(state.fundingAccount.available)} available in ${state.fundingAccount.name}; ${request.amount > state.fundingAccount.available ? "payment exceeds available funds." : "payment fits within available funds."}</div></div>` : "";
   panel.innerHTML = `
     <div class="case-header"><p class="section-kicker">${request.invoiceId} · ${scenarioLabels[request.category].toUpperCase()}</p><h2>${request.vendor}</h2><div class="case-meta"><span class="case-amount">${currency(request.amount)}</span><span class="decision-pill ${statusClass(protectedResult.decision)}">${decisionLabel(protectedResult.decision)}</span></div></div>
     <div class="review-path"><div class="path-step">Document<br />screen</div><div class="path-step">Vendor<br />master</div><div class="path-step">Purchase<br />order</div><div class="path-step">Decision</div></div>
-    <section class="case-section"><h3>Evidence</h3><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Document screen:</strong> ${evidence}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Vendor master:</strong> ${vendorAccount}.</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Purchase order:</strong> ${request.amount === request.expectedAmount ? "amount matches the approved purchase order." : "amount differs from the approved purchase order."}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Decision:</strong> ${protectedResult.reason}</div></div></section>
+    <section class="case-section"><h3>Evidence</h3><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Document screen:</strong> ${evidence}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Vendor master:</strong> ${vendorAccount}.</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Purchase order:</strong> ${request.amount === request.expectedAmount ? "amount matches the approved purchase order." : "amount differs from the approved purchase order."}</div></div>${fundingEvidence}<div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Decision:</strong> ${protectedResult.reason}</div></div></section>
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
     <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
@@ -72,10 +71,13 @@ const accountBalance = document.querySelector("#plaid-account-balance");
 const accountDetail = document.querySelector("#plaid-account-detail");
 
 function hydrateSandbox(data) {
-  const account = data.accounts[0];
+  const account = data.fundingAccount;
+  state.fundingAccount = { name: account.name, available: account.available ?? account.current ?? 0 };
+  results = runBenchmark(requests, state.fundingAccount);
   accountName.textContent = account.name; accountEnding.textContent = `••${account.mask ?? "test"}`;
   accountBalance.textContent = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.available ?? account.current ?? 0);
-  sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "Plaid Sandbox context is connected automatically at server startup. Credentials and access tokens remain server-side.";
+  sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "This available-balance snapshot is used to hold payment requests that exceed the connected funding source.";
+  renderList();
 }
 
 async function loadSandbox() {

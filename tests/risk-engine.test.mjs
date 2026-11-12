@@ -13,3 +13,10 @@ test("vendor-master mismatch cannot be approved", () => {
   const request = requests.find((item) => item.category === "lookalike_vendor");
   assert.equal(protectedDecision(request).decision, "hold");
 });
+
+test("Plaid funding context holds a request above available funds", () => {
+  const request = requests.find((item) => item.category === "insufficient_funds");
+  const decision = protectedDecision(request, undefined, { available: 12060 });
+  assert.equal(decision.decision, "hold");
+  assert.equal(decision.guard, "plaid-funding");
+});
