@@ -1,14 +1,12 @@
 # Sentinel
 
-### A demo app for reviewing suspicious charges with Plaid data, rules, and Claude.
-
 Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel compares a new transaction with the account’s spending history and shows the details that do not fit.
 
-This hackathon project uses Claude to explain the context around a charge. Rule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
+ ule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
-## Why we made this
+## Why 
 
 Fraud tooling often has two bad failure modes:
 
@@ -23,7 +21,7 @@ Sentinel is designed around that second of hesitation before an alert becomes no
 
 Sentinel does not claim to solve fraud. It gives people evidence, shows uncertainty when it exists, and prepares a short summary when they do not recognize a charge.
 
-## What happens in the demo
+## What happens
 
 1. Pick a person and a transaction scenario.
 2. Sentinel builds a lightweight spending reference from that person’s history: regular merchants, normal purchase sizes, familiar places, and usual active hours.
@@ -69,7 +67,7 @@ Plaid Transactions / Demo Scenarios
 - **Claude:** optional Anthropic Messages API call for an independent, structured assessment of the selected charge. The live response is validated before display.
 - **Evaluation:** a synthetic, labeled scenario suite that makes the product’s behavior repeatable during a demo.
 
-## The technical choices we cared about
+## Technical choices
 
 **Keep the evidence inspectable.** Each rule records its own name, score contribution, and human-readable detail. The final risk score is never the only explanation.
 
