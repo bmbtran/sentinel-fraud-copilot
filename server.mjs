@@ -9,7 +9,7 @@ const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
 const anthropicBaseUrl = "https://api.anthropic.com/v1/messages";
 const sandboxState = { accessToken: null, itemId: null, accounts: [], fundingAccount: null };
-const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript" };
+const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript", ".svg": "image/svg+xml" };
 
 function sendJson(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });

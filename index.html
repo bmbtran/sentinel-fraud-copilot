@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="TransferTrust payment-change fraud screening demo" />
     <title>TransferTrust — payment change review</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -19,11 +20,10 @@
       </header>
       <aside class="sidebar" aria-label="Product navigation">
         <nav>
-          <button data-nav="overview"><span class="nav-icon">⌂</span>Overview</button>
           <button class="active" data-nav="queue"><span class="nav-icon">▤</span>Review queue</button>
-          <button data-nav="controls"><span class="nav-icon">◈</span>Controls</button>
-          <button data-nav="audit"><span class="nav-icon">▣</span>Audit trail</button>
-          <button data-nav="sandbox"><span class="nav-icon">▥</span>Sandbox account</button>
+          <button data-nav="root-cause"><span class="nav-icon">◎</span>Root cause</button>
+          <button data-nav="guardrails"><span class="nav-icon">◈</span>Guardrails</button>
+          <button data-nav="alerts"><span class="nav-icon">△</span>Alert intelligence</button>
         </nav>
         <div class="sidebar-foot"><span class="live-dot"></span>Demo mode · read only</div>
       </aside>
@@ -66,6 +66,24 @@
         <aside class="decision-panel" id="decision-panel" aria-live="polite">
           <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare the autonomous-agent and enforced-policy paths.</p></div>
         </aside>
+        <section class="operations-page" id="root-cause-page" hidden aria-labelledby="root-cause-title">
+          <header class="operations-header"><div><p class="section-kicker">ANALYSIS · FIXTURE BATCH F-01</p><h1 id="root-cause-title">Root cause</h1><p>Group stopped requests by the trusted control that disagreed with the document-only agent.</p></div><button class="secondary-action" type="button" data-refresh-root>Refresh analysis</button></header>
+          <section class="root-summary"><div><span>Open clusters</span><strong id="root-cluster-count">0</strong></div><div><span>Risk cases</span><strong id="root-risk-count">0</strong></div><div><span>Agent approvals</span><strong id="root-agent-approvals">0</strong></div><div><span>Policy stops</span><strong id="root-policy-stops">0</strong></div></section>
+          <section class="root-callout"><p class="section-kicker">CONTROL SUMMARY</p><h2 id="root-summary-title">Trusted records close the verification gap.</h2><p id="root-summary-text"></p><p class="analysis-time" id="root-refreshed-at"></p></section>
+          <div class="root-grid" id="root-clusters"></div>
+        </section>
+        <section class="operations-page" id="guardrails-page" hidden aria-labelledby="guardrails-title">
+          <header class="operations-header"><div><p class="section-kicker">PROTECT · ENFORCEMENT</p><h1 id="guardrails-title">Guardrails</h1><p>Turn controls on or off to see their real effect on this fixture batch. Changes stay in this browser.</p></div><button class="secondary-action" type="button" data-reset-controls>Restore recommended controls</button></header>
+          <section class="guardrail-overview" id="guardrail-overview"></section>
+          <section class="rule-panel"><div class="rule-panel-head"><div><p class="section-kicker">RULE CONFIGURATION</p><h2>Active controls</h2></div><p id="guardrail-status">Loading controls…</p></div><div id="guardrail-rules"></div></section>
+          <section class="enforcement-panel"><p class="section-kicker">ENFORCEMENT CHECK</p><div id="enforcement-check"></div></section>
+        </section>
+        <section class="operations-page" id="alerts-page" hidden aria-labelledby="alerts-title">
+          <header class="operations-header"><div><p class="section-kicker">PROTECT · OPERATOR QUEUE</p><h1 id="alerts-title">Alert intelligence</h1><p>Prioritize repeated control failures, inspect a representative case, then resolve or dismiss the local alert.</p></div><button class="secondary-action" type="button" data-reset-alerts>Restore fixture alerts</button></header>
+          <section class="alert-metrics" id="alert-metrics"></section>
+          <section class="alert-section"><div class="rule-panel-head"><div><p class="section-kicker">REQUIRES ATTENTION</p><h2>Open alerts</h2></div></div><div id="open-alerts"></div></section>
+          <section class="alert-section"><div class="rule-panel-head"><div><p class="section-kicker">RECENTLY RESOLVED</p><h2>Closed alerts</h2></div></div><div id="closed-alerts"></div></section>
+        </section>
       </main>
       <dialog class="source-document-dialog" id="source-document-dialog" aria-labelledby="source-document-title">
         <div class="document-modal-head"><div><p class="section-kicker">EXTRACTED DOCUMENT VIEW</p><h2 id="source-document-title">Invoice source</h2></div><button class="modal-close" type="button" data-close-document aria-label="Close document">×</button></div>

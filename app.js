@@ -1,12 +1,16 @@
-import { requests, scenarioLabels } from "./src/data.js";
+import { requests, scenarioLabels, vendorMaster } from "./src/data.js";
 import { recordedAgentBenchmark } from "./src/agent-benchmark.js";
 import { metrics, runBenchmark } from "./src/risk-engine.js";
 
-let results = runBenchmark(requests);
-const firstRisk = results.find((result) => result.request.category === "bank_change");
+const defaultControls = { documentScreen: true, vendorMaster: true, purchaseOrder: true, duplicateCheck: true, funding: true };
+const savedControls = (() => { try { return { ...defaultControls, ...JSON.parse(localStorage.getItem("transfer-trust-controls") ?? "{}") }; } catch { return defaultControls; } })();
+let results = runBenchmark(requests, null, savedControls);
+const firstRisk = results.find((result) => result.request.category !== "clean" && !["insufficient_funds", "duplicate"].includes(result.request.category));
 const savedReviews = (() => { try { return JSON.parse(localStorage.getItem("transfer-trust-reviews") ?? "{}"); } catch { return {}; } })();
 const savedAgentBenchmark = (() => { try { const saved = JSON.parse(localStorage.getItem("transfer-trust-agent-benchmark") ?? "null"); return Array.isArray(saved?.assessments) ? saved : null; } catch { return null; } })();
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null, agentBenchmark: savedAgentBenchmark ?? recordedAgentBenchmark, benchmarkingAgent: false };
+const defaultAlerts = Object.fromEntries(["unverified_destination", "unverified_vendor", "purchase_order_mismatch"].map((category) => [category, "open"]));
+const savedAlerts = (() => { try { return { ...defaultAlerts, ...JSON.parse(localStorage.getItem("transfer-trust-alerts") ?? "{}") }; } catch { return defaultAlerts; } })();
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null, agentBenchmark: savedAgentBenchmark ?? recordedAgentBenchmark, benchmarkingAgent: false, controls: savedControls, alerts: savedAlerts, rootRefreshedAt: new Date(), page: "queue" };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
 const reviewProgress = document.querySelector("#review-progress");
@@ -16,6 +20,10 @@ function classification(result) {
   if (["insufficient_funds", "duplicate"].includes(result.request.category)) return "exception";
   return "attack";
 }
+
+function saveControls() { localStorage.setItem("transfer-trust-controls", JSON.stringify(state.controls)); }
+function saveAlerts() { localStorage.setItem("transfer-trust-alerts", JSON.stringify(state.alerts)); }
+function recomputeResults() { results = runBenchmark(requests, state.fundingAccount, state.controls); updateScenarioCounts(); renderList(); renderRootCause(); renderGuardrails(); renderAlerts(); }
 
 function updateScenarioCounts() {
   const attackCount = results.filter((result) => classification(result) === "attack").length;
@@ -79,6 +87,83 @@ function autonomousAgentDecision(request) {
   return state.agentBenchmark?.assessments?.find((assessment) => assessment.invoiceId === request.invoiceId) ?? null;
 }
 
+const clusterDefinitions = [
+  { category: "unverified_destination", control: "vendorMaster", title: "Destination is not verified", description: "The document looks ordinary, but its requested account differs from the vendor master. The agent has no account-of-record to compare." },
+  { category: "unverified_vendor", control: "vendorMaster", title: "Vendor identity is unverified", description: "A familiar display name is not enough. The intake identity must resolve to a verified vendor record before release." },
+  { category: "purchase_order_mismatch", control: "purchaseOrder", title: "Amount exceeds the approved PO", description: "The invoice gives one amount; the purchase order gives another. The document-only agent cannot see that discrepancy." }
+];
+
+function rootCases(category) { return results.filter((result) => result.request.category === category); }
+function renderRootCause() {
+  const riskCases = results.filter((result) => classification(result) === "attack");
+  const agentStops = riskCases.filter((result) => ["hold", "block"].includes(autonomousAgentDecision(result.request)?.decision)).length;
+  const policyStops = riskCases.filter((result) => result.protected.decision !== "approve").length;
+  document.querySelector("#root-cluster-count").textContent = clusterDefinitions.length;
+  document.querySelector("#root-risk-count").textContent = riskCases.length;
+  document.querySelector("#root-agent-approvals").textContent = riskCases.length - agentStops;
+  document.querySelector("#root-policy-stops").textContent = policyStops;
+  document.querySelector("#root-summary-text").textContent = `${riskCases.length - agentStops} of ${riskCases.length} fixture requests were approved by the document-only agent. The enabled policy controls stopped ${policyStops}. Each cluster below names the trusted context the agent did not have.`;
+  document.querySelector("#root-refreshed-at").textContent = `Analysis refreshed ${state.rootRefreshedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · fixture data only`;
+  document.querySelector("#root-clusters").innerHTML = clusterDefinitions.map((cluster) => {
+    const cases = rootCases(cluster.category);
+    const stopped = cases.filter((result) => result.protected.decision !== "approve").length;
+    return `<article class="root-cluster"><span class="cluster-count">${cases.length} cases · ${stopped} stopped</span><h2>${cluster.title}</h2><p>${cluster.description}</p><p class="cluster-meta">Required control: ${cluster.control === "vendorMaster" ? "vendor master" : "purchase order"}</p><button class="cluster-action" type="button" data-open-case="${cluster.category}">Open representative case →</button></article>`;
+  }).join("");
+}
+
+const controlDefinitions = [
+  { key: "vendorMaster", title: "Vendor master verification", description: "Matches source identity and requested destination to a verified record.", categories: ["unverified_destination", "unverified_vendor"] },
+  { key: "purchaseOrder", title: "Purchase order verification", description: "Holds a request when its amount differs from the approved PO.", categories: ["purchase_order_mismatch"] },
+  { key: "funding", title: "Plaid funding readiness", description: "Holds a payment that exceeds the current connected Sandbox balance.", categories: ["insufficient_funds"] }
+];
+
+function renderGuardrails() {
+  const enabledCount = controlDefinitions.filter((control) => state.controls[control.key]).length;
+  document.querySelector("#guardrail-status").textContent = `${enabledCount} of ${controlDefinitions.length} key controls enabled`;
+  document.querySelector("#guardrail-overview").innerHTML = controlDefinitions.map((control) => `<article class="guardrail-card"><p class="section-kicker">${control.key === "funding" ? "CONTEXT CHECK" : "BLOCKING CONTROL"}</p><h2>${control.title}</h2><p>${control.description}</p><button class="control-toggle ${state.controls[control.key] ? "" : "off"}" type="button" data-toggle-control="${control.key}">${state.controls[control.key] ? "Active — blocking or holding" : "Disabled"}</button></article>`).join("");
+  document.querySelector("#guardrail-rules").innerHTML = controlDefinitions.map((control) => {
+    const affected = results.filter((result) => control.categories.includes(result.request.category) && result.protected.decision !== "approve").length;
+    return `<div class="rule-row"><div class="rule-name">${control.title}<span>${control.description}</span></div><div class="rule-impact">${affected} fixture cases currently intercepted</div><button class="rule-switch ${state.controls[control.key] ? "" : "off"}" type="button" data-toggle-control="${control.key}">${state.controls[control.key] ? "Disable" : "Enable"}</button></div>`;
+  }).join("");
+  const riskCases = results.filter((result) => classification(result) === "attack");
+  const policyStops = riskCases.filter((result) => result.protected.decision !== "approve").length;
+  const escapes = riskCases.length - policyStops;
+  document.querySelector("#enforcement-check").innerHTML = `<div class="enforcement-stat good"><span>Intercepted</span><strong>${policyStops}</strong><p>Risk cases held or blocked by enabled policy.</p></div><div class="enforcement-stat ${escapes ? "warn" : "good"}"><span>Released</span><strong>${escapes}</strong><p>Risk cases that pass with the current control configuration.</p></div><div class="enforcement-stat"><span>Clean holds</span><strong>${metrics(results, "protected").cleanHeld}</strong><p>Clean fixture payments interrupted by policy.</p></div>`;
+}
+
+function renderAlerts() {
+  const alerts = clusterDefinitions.map((cluster) => ({ ...cluster, state: state.alerts[cluster.category] ?? "open", count: rootCases(cluster.category).length }));
+  const open = alerts.filter((alert) => alert.state === "open");
+  const closed = alerts.filter((alert) => alert.state !== "open");
+  document.querySelector("#alert-metrics").innerHTML = `<div><span>Open alerts</span><strong>${open.length}</strong></div><div><span>Risk cases covered</span><strong>${open.reduce((total, alert) => total + alert.count, 0)}</strong></div><div><span>Resolved locally</span><strong>${alerts.filter((alert) => alert.state === "resolved").length}</strong></div><div><span>Dismissed locally</span><strong>${alerts.filter((alert) => alert.state === "dismissed").length}</strong></div>`;
+  const row = (alert, closedView = false) => `<article class="alert-row"><div><div class="alert-title"><span class="severity">${closedView ? alert.state : "high"}</span>${alert.title}</div><p>${alert.count} related fixture cases · ${alert.description}</p></div><div class="alert-actions">${closedView ? `<button type="button" data-alert-action="reopen" data-alert="${alert.category}">Reopen</button>` : `<button type="button" data-open-case="${alert.category}">View case</button><button type="button" data-alert-action="resolve" data-alert="${alert.category}">Resolve</button><button type="button" data-alert-action="dismiss" data-alert="${alert.category}">Dismiss</button>`}</div></article>`;
+  document.querySelector("#open-alerts").innerHTML = open.length ? open.map((alert) => row(alert)).join("") : `<p class="empty-alerts">No open fixture alerts.</p>`;
+  document.querySelector("#closed-alerts").innerHTML = closed.length ? closed.map((alert) => row(alert, true)).join("") : `<p class="empty-alerts">No alerts resolved or dismissed locally.</p>`;
+}
+
+function showPage(page) {
+  state.page = page;
+  const operations = page !== "queue";
+  document.querySelector(".workspace").classList.toggle("operations-mode", operations);
+  document.querySelectorAll(".operations-page").forEach((section) => { section.hidden = section.id !== `${page}-page`; });
+  document.querySelectorAll(".sidebar button[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === page));
+  if (page === "root-cause") renderRootCause();
+  if (page === "guardrails") renderGuardrails();
+  if (page === "alerts") renderAlerts();
+}
+
+function openRepresentativeCase(category) {
+  const caseResult = rootCases(category)[0];
+  if (!caseResult) return;
+  state.filter = "attack";
+  state.search = "";
+  state.selected = caseResult.request.invoiceId;
+  document.querySelector("#filter-search").value = "";
+  document.querySelectorAll(".filters button").forEach((button) => button.classList.toggle("active", button.dataset.filter === "attack"));
+  showPage("queue");
+  renderList();
+}
+
 function renderAiProposal(request) {
   const record = state.aiByInvoice[request.invoiceId];
   const loading = state.extractingInvoice === request.invoiceId;
@@ -96,7 +181,8 @@ function renderPanel(result) {
   const evidence = request.hiddenText || request.note;
   const localReview = state.reviews[request.invoiceId];
   const trace = traceFor(request, protectedResult).map(([label, status, tone]) => `<div class="trace-row ${tone}"><span>${label}</span><span>${status}</span></div>`).join("");
-  const vendorAccount = request.vendorId === "northstar-spoof" ? "No verified vendor record" : request.account;
+  const trustedVendor = vendorMaster[request.vendorId];
+  const vendorAccount = trustedVendor ? `${trustedVendor.name} · ${trustedVendor.account}` : "No matching verified vendor identity";
   const fundingEvidence = state.fundingAccount ? `<div class="evidence-row"><span class="evidence-icon">▥</span><div><strong>Plaid funding check:</strong> ${currency(state.fundingAccount.available)} available in ${state.fundingAccount.name}; ${request.amount > state.fundingAccount.available ? "payment exceeds available funds." : "payment fits within available funds."}</div></div>` : "";
   panel.innerHTML = `
     <div class="case-header"><p class="section-kicker">${request.invoiceId} · ${scenarioLabels[request.category].toUpperCase()}</p><h2>${request.vendor}</h2><div class="case-meta"><span class="case-amount">${currency(request.amount)}</span><span class="decision-pill ${statusClass(protectedResult.decision)}">${decisionLabel(protectedResult.decision)}</span></div></div>
@@ -129,6 +215,30 @@ document.querySelector(".filters").addEventListener("click", (event) => {
   state.filter = button.dataset.filter;
   document.querySelectorAll(".filters button").forEach((item) => item.classList.toggle("active", item === button));
   renderList();
+});
+document.querySelector("#root-cause-page").addEventListener("click", (event) => {
+  if (event.target.closest("[data-refresh-root]")) { state.rootRefreshedAt = new Date(); renderRootCause(); return; }
+  const button = event.target.closest("[data-open-case]");
+  if (button) openRepresentativeCase(button.dataset.openCase);
+});
+document.querySelector("#guardrails-page").addEventListener("click", (event) => {
+  if (event.target.closest("[data-reset-controls]")) { state.controls = { ...defaultControls }; saveControls(); recomputeResults(); return; }
+  const button = event.target.closest("[data-toggle-control]");
+  if (!button) return;
+  const key = button.dataset.toggleControl;
+  state.controls[key] = !state.controls[key];
+  saveControls();
+  recomputeResults();
+});
+document.querySelector("#alerts-page").addEventListener("click", (event) => {
+  if (event.target.closest("[data-reset-alerts]")) { state.alerts = { ...defaultAlerts }; saveAlerts(); renderAlerts(); return; }
+  const caseButton = event.target.closest("[data-open-case]");
+  if (caseButton) { openRepresentativeCase(caseButton.dataset.openCase); return; }
+  const button = event.target.closest("[data-alert-action]");
+  if (!button) return;
+  state.alerts[button.dataset.alert] = button.dataset.alertAction === "reopen" ? "open" : button.dataset.alertAction === "resolve" ? "resolved" : "dismissed";
+  saveAlerts();
+  renderAlerts();
 });
 document.querySelector("#filter-search").addEventListener("input", (event) => { state.search = event.target.value; renderList(); });
 list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
@@ -205,12 +315,11 @@ const accountDetail = document.querySelector("#plaid-account-detail");
 function hydrateSandbox(data) {
   const account = data.fundingAccount;
   state.fundingAccount = { name: account.name, available: account.available ?? account.current ?? 0 };
-  results = runBenchmark(requests, state.fundingAccount);
+  results = runBenchmark(requests, state.fundingAccount, state.controls);
   accountName.textContent = account.name; accountEnding.textContent = `••${account.mask ?? "test"}`;
   accountBalance.textContent = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.available ?? account.current ?? 0);
   sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "This current Plaid Sandbox balance snapshot is used to hold payment requests that exceed the connected funding source.";
-  updateScenarioCounts();
-  renderList();
+  recomputeResults();
 }
 
 async function loadSandbox() {
@@ -223,16 +332,13 @@ async function loadSandbox() {
 document.querySelector(".sidebar nav").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-nav]");
   if (!button) return;
-  document.querySelectorAll(".sidebar button").forEach((item) => item.classList.toggle("active", item === button));
-  const behavior = "smooth";
-  if (button.dataset.nav === "overview") document.querySelector(".queue-header").scrollIntoView({ behavior, block: "start" });
-  if (button.dataset.nav === "queue") document.querySelector(".queue-table").scrollIntoView({ behavior, block: "start" });
-  if (button.dataset.nav === "controls") { state.selected = results.find((result) => result.protected.decision === "block")?.request.invoiceId ?? state.selected; renderList(); panel.querySelector(".review-path")?.scrollIntoView({ behavior, block: "start" }); }
-  if (button.dataset.nav === "audit") panel.querySelector(".audit-fields")?.scrollIntoView({ behavior, block: "start" });
-  if (button.dataset.nav === "sandbox") document.querySelector("#sandbox-context").scrollIntoView({ behavior, block: "start" });
+  showPage(button.dataset.nav);
 });
 
 updateScenarioCounts();
 renderList();
 updateReviewProgress();
+renderRootCause();
+renderGuardrails();
+renderAlerts();
 loadSandbox();

@@ -10,20 +10,21 @@ export function naiveDecision(request) {
   return { decision: "approve", reason: "Invoice details accepted" };
 }
 
-export function protectedDecision(request, master = vendorMaster, fundingAccount = null) {
-  if (request.hiddenText) return { decision: "block", reason: "Document contains an instruction to override payment controls", guard: "input-screen" };
-  if (PII_PATTERN.test(request.note)) return { decision: "block", reason: "Sensitive identifier detected in payment context", guard: "sensitive-data" };
-  if (BANK_CHANGE_PATTERN.test(request.note)) return { decision: "block", reason: "Bank changes cannot originate in an invoice", guard: "vendor-master" };
-  if (!master[request.vendorId]) return { decision: "hold", reason: "Vendor does not match the verified vendor master", guard: "vendor-master" };
-  if (request.account !== master[request.vendorId].account) return { decision: "block", reason: "Requested payout account differs from the vendor master", guard: "vendor-master" };
-  if (request.amount !== request.expectedAmount) return { decision: "hold", reason: "Amount differs from the approved purchase order", guard: "purchase-order" };
-  if (request.category === "duplicate") return { decision: "hold", reason: "Invoice already appears in payment history", guard: "duplicate-check" };
-  if (fundingAccount && request.amount > fundingAccount.available) return { decision: "hold", reason: "Available funds in the connected account are below the payment amount", guard: "plaid-funding" };
+export function protectedDecision(request, master = vendorMaster, fundingAccount = null, controls = {}) {
+  const enabled = { documentScreen: true, vendorMaster: true, purchaseOrder: true, duplicateCheck: true, funding: true, ...controls };
+  if (enabled.documentScreen && request.hiddenText) return { decision: "block", reason: "Document contains an instruction to override payment controls", guard: "input-screen" };
+  if (enabled.documentScreen && PII_PATTERN.test(request.note)) return { decision: "block", reason: "Sensitive identifier detected in payment context", guard: "sensitive-data" };
+  if (enabled.vendorMaster && BANK_CHANGE_PATTERN.test(request.note)) return { decision: "block", reason: "Bank changes cannot originate in an invoice", guard: "vendor-master" };
+  if (enabled.vendorMaster && !master[request.vendorId]) return { decision: "hold", reason: "Vendor does not match the verified vendor master", guard: "vendor-master" };
+  if (enabled.vendorMaster && request.account !== master[request.vendorId].account) return { decision: "block", reason: "Requested payout account differs from the vendor master", guard: "vendor-master" };
+  if (enabled.purchaseOrder && request.amount !== request.expectedAmount) return { decision: "hold", reason: "Amount differs from the approved purchase order", guard: "purchase-order" };
+  if (enabled.duplicateCheck && request.category === "duplicate") return { decision: "hold", reason: "Invoice already appears in payment history", guard: "duplicate-check" };
+  if (enabled.funding && fundingAccount && request.amount > fundingAccount.available) return { decision: "hold", reason: "Available funds in the connected account are below the payment amount", guard: "plaid-funding" };
   return { decision: "approve", reason: "Verified against vendor master and purchase order", guard: "verified" };
 }
 
-export function runBenchmark(items, fundingAccount = null) {
-  return items.map((request) => ({ request, naive: naiveDecision(request), protected: protectedDecision(request, vendorMaster, fundingAccount) }));
+export function runBenchmark(items, fundingAccount = null, controls = {}) {
+  return items.map((request) => ({ request, naive: naiveDecision(request), protected: protectedDecision(request, vendorMaster, fundingAccount, controls) }));
 }
 
 export function metrics(results, version) {
