@@ -20,13 +20,13 @@
       </header>
       <aside class="sidebar" aria-label="Product navigation">
         <nav>
-          <a href="#review-queue"><span class="nav-icon">⌂</span>Overview</a>
-          <a class="active" href="#review-queue"><span class="nav-icon">▤</span>Review queue</a>
-          <a href="#control-summary"><span class="nav-icon">◈</span>Controls</a>
-          <a href="#decision-panel"><span class="nav-icon">▣</span>Audit trail</a>
-          <a href="#sandbox-context"><span class="nav-icon">▥</span>Sandbox account</a>
+          <button data-nav="overview"><span class="nav-icon">⌂</span>Overview</button>
+          <button class="active" data-nav="queue"><span class="nav-icon">▤</span>Review queue</button>
+          <button data-nav="controls"><span class="nav-icon">◈</span>Controls</button>
+          <button data-nav="audit"><span class="nav-icon">▣</span>Audit trail</button>
+          <button data-nav="sandbox"><span class="nav-icon">▥</span>Sandbox account</button>
         </nav>
-        <div class="sidebar-foot"><span class="live-dot"></span>Demo mode</div>
+        <div class="sidebar-foot"><span class="live-dot"></span>Demo mode · read only</div>
       </aside>
       <main class="workspace" id="review-queue">
         <section class="queue-area">
@@ -59,8 +59,7 @@
               <div><span>Linked account</span><strong id="plaid-account-name">No test account linked</strong></div>
               <div><span>Account ending</span><strong id="plaid-account-ending">••••</strong></div>
               <div><span>Available balance</span><strong id="plaid-account-balance">—</strong></div>
-              <div><span>Status</span><strong class="connection-status" id="plaid-status"><i></i>not connected</strong></div>
-              <button class="connect-button" id="connect-sandbox" type="button">Connect test account</button>
+              <div><span>Status</span><strong class="connection-status" id="plaid-status"><i></i>connecting</strong></div>
             </div>
             <p class="sandbox-detail" id="plaid-account-detail">Account context is optional and never determines a fraud decision.</p>
           </section>

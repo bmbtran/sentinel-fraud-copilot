@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
-const sandboxState = { accessToken: null, itemId: null };
+const sandboxState = { accessToken: null, itemId: null, accounts: [] };
 const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript" };
 
 function sendJson(response, status, body) {
@@ -44,12 +44,12 @@ async function connectSandbox() {
     sandboxState.itemId = exchange.item_id;
   }
   const accounts = await plaidPost("/accounts/get", { access_token: sandboxState.accessToken });
+  sandboxState.accounts = accounts.accounts.map(({ name, mask, subtype, balances }) => ({
+    name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
+  }));
   return {
     connected: true,
-    itemId: sandboxState.itemId,
-    accounts: accounts.accounts.map(({ name, mask, subtype, balances }) => ({
-      name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
-    }))
+    accounts: sandboxState.accounts
   };
 }
 
@@ -68,16 +68,12 @@ async function serveStatic(request, response) {
 }
 
 createServer(async (request, response) => {
-  if (request.method === "POST" && request.url === "/api/plaid/connect-sandbox") {
-    try {
-      sendJson(response, 200, await connectSandbox());
-    } catch (error) {
-      sendJson(response, 500, { error: error instanceof Error ? error.message : "Could not connect to Plaid Sandbox" });
-    }
-    return;
-  }
   if (request.method === "GET" && request.url === "/api/plaid/status") {
-    sendJson(response, 200, { connected: Boolean(sandboxState.accessToken), environment: "sandbox" });
+    try {
+      sendJson(response, 200, { environment: "sandbox", ...(await connectSandbox()) });
+    } catch (error) {
+      sendJson(response, 500, { environment: "sandbox", connected: false, error: error instanceof Error ? error.message : "Could not connect to Plaid Sandbox" });
+    }
     return;
   }
   if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed" });
