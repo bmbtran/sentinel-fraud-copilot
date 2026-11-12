@@ -1,0 +1,39 @@
+README.md
+  s_0636dc79126953::t_f47a4bc3c842c7 3,5,7,9-13,15,17,19,21,27,33,35
+server.mjs
+  s_0636dc79126953::t_6b7321bc74ccdf 1,7-8,13,15-26,28-44,46-56
+styles.css
+  s_0636dc79126953::t_ae6e063b6f7567 1
+  s_0636dc79126953::t_9b14947b8f2460 2
+src/command-data.js
+  s_0636dc79126953::t_d82cb5fa7a2e5d 1-13
+src/risk-core.js
+  s_0636dc79126953::t_d82cb5fa7a2e5d 1-37
+app.js
+  s_0636dc79126953::t_c9d378d9f3a711 1-24
+tests/risk-core.test.mjs
+  s_0636dc79126953::t_89c17c26c509b6 3-4,6-9,12-18,21-22
+index.html
+  s_0636dc79126953::t_3084db38655600 6-7,15-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c102f44eacea129423ac69f6a506cc2671c42170",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
