@@ -22,6 +22,7 @@
         <nav>
           <button class="active" data-nav="queue"><span class="nav-icon">▤</span>Review queue</button>
           <button data-nav="root-cause"><span class="nav-icon">◎</span>Root cause</button>
+          <button data-nav="agent-trust"><span class="nav-icon">◒</span>Agent trust</button>
           <button data-nav="guardrails"><span class="nav-icon">◈</span>Guardrails</button>
           <button data-nav="alerts"><span class="nav-icon">△</span>Alert intelligence</button>
         </nav>
@@ -77,6 +78,12 @@
           <section class="guardrail-overview" id="guardrail-overview"></section>
           <section class="rule-panel"><div class="rule-panel-head"><div><p class="section-kicker">RULE CONFIGURATION</p><h2>Active controls</h2></div><p id="guardrail-status">Loading controls…</p></div><div id="guardrail-rules"></div></section>
           <section class="enforcement-panel"><p class="section-kicker">ENFORCEMENT CHECK</p><div id="enforcement-check"></div></section>
+        </section>
+        <section class="operations-page" id="agent-trust-page" hidden aria-labelledby="agent-trust-title">
+          <header class="operations-header"><div><p class="section-kicker">GOVERN · AGENT RELEASE READINESS</p><h1 id="agent-trust-title">Agent trust score</h1><p>A transparent readiness score for this payment workflow. It measures observed decisions and evidence access—not a person’s financial creditworthiness.</p></div><button class="secondary-action" type="button" data-recalculate-trust>Recalculate from Claude baseline</button></header>
+          <section class="trust-hero" id="trust-hero"></section>
+          <section class="trust-breakdown" id="trust-breakdown"></section>
+          <section class="trust-policy"><p class="section-kicker">RELEASE POLICY</p><h2 id="trust-policy-title"></h2><p id="trust-policy-copy"></p><button class="secondary-action" type="button" data-open-trust-case>Inspect a disagreement</button></section>
         </section>
         <section class="operations-page" id="alerts-page" hidden aria-labelledby="alerts-title">
           <header class="operations-header"><div><p class="section-kicker">PROTECT · OPERATOR QUEUE</p><h1 id="alerts-title">Alert intelligence</h1><p>Prioritize repeated control failures, inspect a representative case, then resolve or dismiss the local alert.</p></div><button class="secondary-action" type="button" data-reset-alerts>Restore fixture alerts</button></header>

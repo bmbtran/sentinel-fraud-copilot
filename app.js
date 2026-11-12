@@ -141,6 +141,23 @@ function renderAlerts() {
   document.querySelector("#closed-alerts").innerHTML = closed.length ? closed.map((alert) => row(alert, true)).join("") : `<p class="empty-alerts">No alerts resolved or dismissed locally.</p>`;
 }
 
+function trustProfile() {
+  const canonicalResults = runBenchmark(requests, state.fundingAccount, defaultControls);
+  const riskCases = canonicalResults.filter((result) => classification(result) === "attack");
+  const agentStops = riskCases.filter((result) => ["hold", "block"].includes(autonomousAgentDecision(result.request)?.decision)).length;
+  const disagreements = riskCases.filter((result) => autonomousAgentDecision(result.request)?.decision === "approve" && result.protected.decision !== "approve");
+  const score = Math.round((agentStops / riskCases.length) * 100);
+  return { score, total: riskCases.length, agentStops, disagreements, tier: score < 40 ? "Advisory only" : score < 75 ? "Human approval required" : "Limited release candidate" };
+}
+
+function renderAgentTrust() {
+  const trust = trustProfile();
+  document.querySelector("#trust-hero").innerHTML = `<div class="trust-score"><div><strong>${trust.score}</strong><span>/ 100</span></div></div><div class="trust-copy"><p class="section-kicker">FIXTURE-BASED RELEASE READINESS</p><h2>${trust.tier}</h2><p>Claude stopped ${trust.agentStops} of ${trust.total} document-only risk cases. It approved ${trust.disagreements.length} requests that the fully enabled policy stopped with trusted evidence.</p><p class="trust-note">This is a workflow-specific reliability score, not a model benchmark or a financial credit score.</p></div>`;
+  document.querySelector("#trust-breakdown").innerHTML = `<article class="trust-factor"><span>Observed interception</span><strong>${trust.agentStops} / ${trust.total}</strong><p>Cases where the autonomous agent chose hold or block before policy intervened.</p></article><article class="trust-factor"><span>Policy disagreements</span><strong>${trust.disagreements.length}</strong><p>Agent approvals that conflict with vendor-master or purchase-order verification.</p></article><article class="trust-factor"><span>Permitted authority</span><strong>None</strong><p>Claude has read-only investigation tools. Deterministic policy retains payment authority.</p></article>`;
+  document.querySelector("#trust-policy-title").textContent = `Release recommendation: ${trust.tier}`;
+  document.querySelector("#trust-policy-copy").textContent = trust.score < 40 ? "Do not grant payment-release authority. Allow the agent to investigate and recommend a human review, while policy independently enforces every payment decision." : "Keep deterministic policy enforcement and require a human approval for any release. Re-evaluate against a larger held-out fixture set before expanding authority.";
+}
+
 function showPage(page) {
   state.page = page;
   const operations = page !== "queue";
@@ -148,6 +165,7 @@ function showPage(page) {
   document.querySelectorAll(".operations-page").forEach((section) => { section.hidden = section.id !== `${page}-page`; });
   document.querySelectorAll(".sidebar button[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === page));
   if (page === "root-cause") renderRootCause();
+  if (page === "agent-trust") renderAgentTrust();
   if (page === "guardrails") renderGuardrails();
   if (page === "alerts") renderAlerts();
 }
@@ -167,12 +185,13 @@ function openRepresentativeCase(category) {
 function renderAiProposal(request) {
   const record = state.aiByInvoice[request.invoiceId];
   const loading = state.extractingInvoice === request.invoiceId;
-  if (loading) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · PROPOSAL, NOT AUTHORIZATION</p><h3>Reading the source document…</h3><p>TransferTrust will still evaluate the original document and trusted records independently.</p></div><span class="ai-state">Extracting</span></section>`;
-  if (record?.error) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · PROPOSAL, NOT AUTHORIZATION</p><h3>Extraction unavailable</h3><p>${escapeHtml(record.error)}</p></div><button class="ai-extract-button" type="button" data-run-ai>Try Claude extraction</button></section>`;
-  if (!record) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · PROPOSAL, NOT AUTHORIZATION</p><h3>Let Claude read this request</h3><p>Claude can extract terms and make a nonbinding recommendation. It cannot release a payment.</p></div><button class="ai-extract-button" type="button" data-run-ai>Extract with Claude</button></section>`;
+  if (loading) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · READ-ONLY INVESTIGATION</p><h3>Gathering verified evidence…</h3><p>Claude can call bounded read-only tools. TransferTrust still owns payment authority.</p></div><span class="ai-state">Investigating</span></section>`;
+  if (record?.error) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · READ-ONLY INVESTIGATION</p><h3>Investigation unavailable</h3><p>${escapeHtml(record.error)}</p></div><button class="ai-extract-button" type="button" data-run-ai>Try investigation</button></section>`;
+  if (!record) return `<section class="ai-proposal"><div><p class="section-kicker">CLAUDE AGENT · READ-ONLY INVESTIGATION</p><h3>Investigate with Claude tools</h3><p>Claude can query bounded vendor, purchase-order, invoice-history, and Plaid Sandbox tools. It cannot release a payment.</p></div><button class="ai-extract-button" type="button" data-run-ai>Run investigation</button></section>`;
   const { terms, model } = record;
   const recommendation = terms.reviewRecommendation === "hold" ? `Hold for review — ${terms.recommendationReason ?? "No reason returned"}` : `No risk signal from Claude — ${terms.recommendationReason ?? "This is not an approval"}`;
-  return `<section class="ai-proposal"><div class="ai-proposal-head"><div><p class="section-kicker">CLAUDE AGENT · PROPOSAL, NOT AUTHORIZATION</p><h3>Structured terms extracted</h3></div><button class="ai-extract-button" type="button" data-run-ai>Run again</button></div><dl class="ai-terms"><div><dt>Vendor</dt><dd>${escapeHtml(terms.vendor)}</dd></div><div><dt>Invoice</dt><dd>${escapeHtml(terms.invoiceId)}</dd></div><div><dt>Amount</dt><dd>${terms.amount == null ? "—" : escapeHtml(currency(terms.amount))}</dd></div><div><dt>Account</dt><dd>${escapeHtml(terms.account)}</dd></div></dl><p class="ai-recommendation"><b>Agent recommendation:</b> ${escapeHtml(recommendation)}</p>${terms.suspiciousContent ? `<p class="ai-warning"><b>Agent-noted text:</b> ${escapeHtml(terms.suspiciousContent)}</p>` : ""}<p class="ai-footnote">${escapeHtml(model)} · Claude can surface risk, but it has no payment authority. The enforced-policy result is calculated separately from the original document and verified records.</p></section>`;
+  const tools = record.toolTrace?.length ? `<p class="ai-tools"><b>Read-only tool trace:</b> ${record.toolTrace.map((entry) => `${escapeHtml(entry.tool)} — ${escapeHtml(entry.summary)}`).join(" · ")}</p>` : "";
+  return `<section class="ai-proposal"><div class="ai-proposal-head"><div><p class="section-kicker">CLAUDE AGENT · READ-ONLY INVESTIGATION</p><h3>Verified evidence gathered</h3></div><button class="ai-extract-button" type="button" data-run-ai>Run again</button></div><dl class="ai-terms"><div><dt>Vendor</dt><dd>${escapeHtml(terms.vendor)}</dd></div><div><dt>Invoice</dt><dd>${escapeHtml(terms.invoiceId)}</dd></div><div><dt>Amount</dt><dd>${terms.amount == null ? "—" : escapeHtml(currency(terms.amount))}</dd></div><div><dt>Account</dt><dd>${escapeHtml(terms.account)}</dd></div></dl>${tools}<p class="ai-recommendation"><b>Agent recommendation:</b> ${escapeHtml(recommendation)}</p>${terms.suspiciousContent ? `<p class="ai-warning"><b>Agent-noted text:</b> ${escapeHtml(terms.suspiciousContent)}</p>` : ""}<p class="ai-footnote">${escapeHtml(model)} · Tool access is read-only. The deterministic policy still controls approve, hold, and block.</p></section>`;
 }
 
 function renderPanel(result) {
@@ -240,6 +259,13 @@ document.querySelector("#alerts-page").addEventListener("click", (event) => {
   saveAlerts();
   renderAlerts();
 });
+document.querySelector("#agent-trust-page").addEventListener("click", (event) => {
+  if (event.target.closest("[data-recalculate-trust]")) { runAgentBenchmark(); return; }
+  if (event.target.closest("[data-open-trust-case]")) {
+    const disagreement = trustProfile().disagreements[0];
+    if (disagreement) openRepresentativeCase(disagreement.request.category);
+  }
+});
 document.querySelector("#filter-search").addEventListener("input", (event) => { state.search = event.target.value; renderList(); });
 list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
 panel.addEventListener("click", (event) => {
@@ -258,7 +284,7 @@ async function runClaudeExtraction() {
   state.extractingInvoice = invoiceId;
   renderPanel(result);
   try {
-    const response = await fetch("/api/ai/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document: documentForClaude(result.request) }) });
+    const response = await fetch("/api/ai/investigate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoiceId }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "Claude extraction failed.");
     state.aiByInvoice[invoiceId] = payload;
@@ -286,6 +312,7 @@ async function runAgentBenchmark() {
     state.benchmarkingAgent = false;
     updateScenarioCounts();
     renderList();
+    renderAgentTrust();
   }
 }
 const sourceDialog = document.querySelector("#source-document-dialog");
@@ -339,6 +366,7 @@ updateScenarioCounts();
 renderList();
 updateReviewProgress();
 renderRootCause();
+renderAgentTrust();
 renderGuardrails();
 renderAlerts();
 loadSandbox();
