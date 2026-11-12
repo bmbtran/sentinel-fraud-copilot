@@ -8,7 +8,7 @@ TransferTrust is an original portfolio prototype that puts a transparent risk de
 
 1. A synthetic payment enters a command-center stream.
 2. A transparent rules engine scores device sharing, destination fan-in, transaction velocity, and amount signals.
-3. The operator can compare a recorded **Claude document-only** baseline with **Claude plus deterministic evidence rules** on a fixed 12-case adversarial suite: 3/12 versus 12/12 cases stopped.
+3. The operator can run a real **Claude document-only** baseline against a fixed 12-case adversarial suite and compare it with **Claude plus deterministic evidence rules**, which stop 12/12 cases. Each run records its model, prompt version, timestamp, and per-case outputs because model behavior can vary across runs.
 4. Only a low-risk fixture may call Plaid Sandbox's Transfer authorization endpoint.
 5. Holds, escalations, and Plaid authorizations append a hash-linked audit event. Transfer creation is intentionally unavailable.
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { paymentFixtures } from "../src/command-data.js";
 import { assessPayment, buildGraph, queueSummary } from "../src/risk-core.js";
+import { evaluationSuite, policyDecision } from "../src/evaluation-suite.js";
 
 test("only low-risk fixtures can reach the Plaid authorization boundary", () => {
   const results = paymentFixtures.map((payment) => ({ id: payment.id, assessment: assessPayment(payment) }));
@@ -20,4 +21,13 @@ test("shared devices and flagged destinations form visible risk evidence", () =>
 
 test("command-center metrics match the deterministic fixture stream", () => {
   assert.deepEqual(queueSummary(paymentFixtures), { total: 8, ready: 3, held: 2, critical: 3, totalAmount: 19074 });
+});
+
+test("all evaluation-suite attacks are stopped by a named deterministic rule", () => {
+  assert.equal(evaluationSuite.length, 12);
+  for (const item of evaluationSuite) {
+    const decision = policyDecision(item);
+    assert.notEqual(decision.decision, "approve");
+    assert.match(decision.rule, /vendor-master|purchase-order/);
+  }
 });
