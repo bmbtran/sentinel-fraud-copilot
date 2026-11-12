@@ -67,6 +67,10 @@
           <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare its naive and protected decision paths.</p></div>
         </aside>
       </main>
+      <dialog class="source-document-dialog" id="source-document-dialog" aria-labelledby="source-document-title">
+        <div class="document-modal-head"><div><p class="section-kicker">EXTRACTED DOCUMENT VIEW</p><h2 id="source-document-title">Invoice source</h2></div><button class="modal-close" type="button" data-close-document aria-label="Close document">×</button></div>
+        <div id="source-document-content"></div>
+      </dialog>
     </div>
     <script type="module" src="app.js"></script>
   </body>

@@ -24,9 +24,11 @@ The app creates a Plaid Sandbox Item server-side and uses the connected Cash Man
 ## Demo workflow
 
 1. Select a fraud scenario to inspect its deterministic evidence trail.
-2. Select **Insufficient funds** to see the connected Plaid Sandbox balance affect the result.
-3. Record a local operator acknowledgement; it persists in browser storage.
-4. Export the review audit JSON.
+2. Open **View source document** to inspect the synthetic invoice text layer that the document screen evaluated.
+3. Read the control trace, including the explicit “not initiated” release-action entry after a block or hold.
+4. Select **Insufficient funds** to see the connected Plaid Sandbox balance affect the result.
+5. Record a local operator acknowledgement; it persists in browser storage.
+6. Export the review audit JSON.
 
 ## Intentional boundaries
 

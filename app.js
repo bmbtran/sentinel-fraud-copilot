@@ -31,11 +31,25 @@ function decisionLabel(decision) { return decision === "block" ? "Blocked" : dec
 function currency(value) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
 function saveReviews() { localStorage.setItem("transfer-trust-reviews", JSON.stringify(state.reviews)); }
 function updateReviewProgress() { reviewProgress.textContent = `${Object.keys(state.reviews).length} ${Object.keys(state.reviews).length === 1 ? "review" : "reviews"} recorded locally`; }
+function traceFor(request, decision) {
+  const stoppedAtInput = decision.guard === "input-screen" || decision.guard === "sensitive-data";
+  const stoppedAtVendor = decision.guard === "vendor-master";
+  const stoppedAtPurchaseOrder = decision.guard === "purchase-order" || decision.guard === "duplicate-check";
+  const stoppedAtFunding = decision.guard === "plaid-funding";
+  return [
+    ["Document screen", stoppedAtInput ? "blocked" : "passed", stoppedAtInput ? "stop" : "pass"],
+    ["Vendor master", stoppedAtInput ? "skipped" : stoppedAtVendor ? decision.decision : "verified", stoppedAtInput ? "skip" : stoppedAtVendor ? decision.decision : "pass"],
+    ["Purchase order and duplicate check", stoppedAtInput || stoppedAtVendor ? "skipped" : stoppedAtPurchaseOrder ? "held" : "passed", stoppedAtInput || stoppedAtVendor ? "skip" : stoppedAtPurchaseOrder ? "hold" : "pass"],
+    ["Plaid funding check", stoppedAtInput || stoppedAtVendor || stoppedAtPurchaseOrder ? "skipped" : stoppedAtFunding ? "held" : state.fundingAccount ? "passed" : "pending", stoppedAtInput || stoppedAtVendor || stoppedAtPurchaseOrder ? "skip" : stoppedAtFunding ? "hold" : "pass"],
+    ["Release action", decision.decision === "approve" ? "eligible — not executed in demo" : "not initiated", decision.decision === "approve" ? "pass" : "stop"]
+  ];
+}
 
 function renderPanel(result) {
   const { request, naive, protected: protectedResult } = result;
   const evidence = request.hiddenText || request.note;
   const localReview = state.reviews[request.invoiceId];
+  const trace = traceFor(request, protectedResult).map(([label, status, tone]) => `<div class="trace-row ${tone}"><span>${label}</span><span>${status}</span></div>`).join("");
   const vendorAccount = request.vendorId === "northstar-spoof" ? "No verified vendor record" : request.account;
   const fundingEvidence = state.fundingAccount ? `<div class="evidence-row"><span class="evidence-icon">▥</span><div><strong>Plaid funding check:</strong> ${currency(state.fundingAccount.available)} available in ${state.fundingAccount.name}; ${request.amount > state.fundingAccount.available ? "payment exceeds available funds." : "payment fits within available funds."}</div></div>` : "";
   panel.innerHTML = `
@@ -45,6 +59,8 @@ function renderPanel(result) {
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
     <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
+    <section class="proof-section"><h3>Control trace</h3>${trace}</section>
+    <button class="source-document-button" type="button" data-view-document>View source document</button>
     <div class="review-record"><p>${localReview ? `<strong>Review recorded</strong><br />${new Date(localReview.recordedAt).toLocaleString()}` : "No operator review recorded yet. This demo stores review acknowledgements locally in the browser."}</p><button class="review-button" type="button" data-review-action="${localReview ? "remove" : "record"}">${localReview ? "Remove local review" : `Record ${decisionLabel(protectedResult.decision)} review`}</button></div>
     <div class="audit-fields"><div><span>Requested account</span><b>${request.account}</b></div><div><span>Applied control</span><b>${protectedResult.guard ?? "none"}</b></div><div><span>Review mode</span><b>Deterministic demo</b></div></div>`;
 }
@@ -70,12 +86,24 @@ document.querySelector(".filters").addEventListener("click", (event) => {
 document.querySelector("#filter-search").addEventListener("input", (event) => { state.search = event.target.value; renderList(); });
 list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
 panel.addEventListener("click", (event) => {
+  if (event.target.closest("button[data-view-document]")) { openSourceDocument(); return; }
   const button = event.target.closest("button[data-review-action]");
   if (!button || !state.selected) return;
   if (button.dataset.reviewAction === "remove") delete state.reviews[state.selected];
   else state.reviews[state.selected] = { decision: results.find((result) => result.request.invoiceId === state.selected)?.protected.decision, recordedAt: new Date().toISOString() };
   saveReviews(); updateReviewProgress(); renderList();
 });
+const sourceDialog = document.querySelector("#source-document-dialog");
+const sourceDocumentContent = document.querySelector("#source-document-content");
+function openSourceDocument() {
+  const result = results.find((item) => item.request.invoiceId === state.selected);
+  if (!result) return;
+  const { request } = result;
+  const extractedLayer = request.hiddenText ? `<p class="injected-text"><strong>Risk signal in extracted text layer:</strong><br />${request.hiddenText}</p>` : "";
+  sourceDocumentContent.innerHTML = `<article class="document-sheet"><p class="document-meta">${request.invoiceId} · ${scenarioLabels[request.category].toUpperCase()}</p><p><strong>${request.vendor}</strong><br />Requested account: ${request.account}<br />Amount due: ${currency(request.amount)}</p><p>${request.note}</p>${extractedLayer}</article><p class="document-footnote">This is a synthetic document view. Highlighted content is what the pre-release document screen evaluated; it is not an instruction to the application.</p>`;
+  sourceDialog.showModal();
+}
+sourceDialog.addEventListener("click", (event) => { if (event.target === sourceDialog || event.target.closest("[data-close-document]")) sourceDialog.close(); });
 document.querySelector("#export-audit").addEventListener("click", () => {
   const report = Object.entries(state.reviews).map(([invoiceId, review]) => ({ invoiceId, ...review }));
   const url = URL.createObjectURL(new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), reviews: report }, null, 2)], { type: "application/json" }));
