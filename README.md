@@ -4,6 +4,8 @@
 
 Sentinel builds a personal spending fingerprint, compares deterministic risk rules with Claude’s contextual reasoning, and explains why a transaction was flagged before asking the user to act.
 
+![Sentinel charge-review demo](docs/sentinel-demo.png)
+
 ## What is included
 
 - Plaid-inspired, responsive command interface with overview, alert center, Trust Lab, and methodology views.
