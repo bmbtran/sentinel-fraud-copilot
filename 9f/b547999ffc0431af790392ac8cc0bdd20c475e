@@ -1,0 +1,25 @@
+docs/case-study.md
+  s_0636dc79126953::t_e008c205d1083a 27-31
+app.js
+  s_0636dc79126953::t_a93d73856696d7 34-46,52,62-63,89,96-106
+index.html
+  s_0636dc79126953::t_a93d73856696d7 70-73
+styles.css
+  s_0636dc79126953::t_a93d73856696d7 24-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9fb547999ffc0431af790392ac8cc0bdd20c475e",
+  "prompts": {},
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
