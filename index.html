@@ -14,9 +14,8 @@
     <div class="app-shell">
       <header class="app-header">
         <a class="brand" href="#review-queue">TransferTrust<span>.</span></a>
-        <span class="env-tag">Sandbox</span>
-        <span class="run-id">RUN TT-26-1112-01</span>
-        <span class="system-status"><i></i>Systems healthy</span>
+        <span class="env-tag">Plaid Sandbox</span>
+        <span class="run-id">FIXTURE BATCH F-01</span>
       </header>
       <aside class="sidebar" aria-label="Product navigation">
         <nav>
@@ -32,19 +31,19 @@
         <section class="queue-area">
           <header class="queue-header">
             <p class="section-kicker">OPERATIONS · PAYMENT CONTROLS</p>
-            <div class="title-row"><div><h1>Payment change review</h1><p>Batch 04 · 30 requests awaiting operator review</p></div><div class="run-tools"><span id="review-progress">0 reviews recorded locally</span><button id="export-audit" type="button">Export audit JSON</button></div></div>
+            <div class="title-row"><div><h1>Payment change review</h1><p>Fixture batch F-01 · <span id="batch-count">0</span> requests awaiting operator review</p></div><div class="run-tools"><span id="review-progress">0 reviews recorded locally</span><button id="export-audit" type="button">Export audit JSON</button></div></div>
           </header>
           <section class="benchmark-strip" id="control-summary" aria-label="Benchmark results">
-            <div class="benchmark-result naive"><strong>Naive flow:</strong> <span><b id="naive-stopped">0</b> / 12 attacks stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-result naive"><strong>Naive flow:</strong> <span><b id="naive-stopped">0</b> / <b id="naive-attack-total">0</b> attacks stopped</span><div class="meter"><i></i></div></div>
             <div class="benchmark-divider"></div>
-            <div class="benchmark-result protected"><strong>Protected flow:</strong> <span><b id="protected-stopped">12</b> / 12 attacks stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-result protected"><strong>Protected flow:</strong> <span><b id="protected-stopped">0</b> / <b id="protected-attack-total">0</b> attacks stopped</span><div class="meter"><i></i></div></div>
           </section>
           <section class="queue-tools" aria-label="Review queue controls">
             <div class="filters" role="toolbar" aria-label="Filter payment requests">
-              <button class="active" data-filter="all">All risk signals <span>30</span></button>
-              <button data-filter="attack">Fraud scenarios <span>12</span></button>
-              <button data-filter="clean">Clean payments <span>16</span></button>
-              <button data-filter="exception">Exceptions <span>2</span></button>
+              <button class="active" data-filter="all">All risk signals <span id="all-count">0</span></button>
+              <button data-filter="attack">Fraud scenarios <span id="attack-count">0</span></button>
+              <button data-filter="clean">Clean payments <span id="clean-count">0</span></button>
+              <button data-filter="exception">Exceptions <span id="exception-count">0</span></button>
             </div>
             <label class="search"><span>⌕</span><input id="filter-search" type="search" placeholder="Search vendor, invoice, or account…" /></label>
           </section>
@@ -60,7 +59,7 @@
               <div><span>Available balance</span><strong id="plaid-account-balance">—</strong></div>
               <div><span>Status</span><strong class="connection-status" id="plaid-status"><i></i>connecting</strong></div>
             </div>
-            <p class="sandbox-detail" id="plaid-account-detail">The review checks whether the selected payment fits within the connected account's available balance.</p>
+            <p class="sandbox-detail" id="plaid-account-detail">The review checks whether the selected payment fits within the current Plaid Sandbox balance.</p>
           </section>
         </section>
         <aside class="decision-panel" id="decision-panel" aria-live="polite">

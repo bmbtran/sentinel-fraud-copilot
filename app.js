@@ -8,13 +8,26 @@ const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceI
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
 const reviewProgress = document.querySelector("#review-progress");
-document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
-document.querySelector("#protected-stopped").textContent = metrics(results, "protected").stopped;
 
 function classification(result) {
   if (result.request.category === "clean") return "clean";
   if (["insufficient_funds", "duplicate"].includes(result.request.category)) return "exception";
   return "attack";
+}
+
+function updateScenarioCounts() {
+  const attackCount = results.filter((result) => classification(result) === "attack").length;
+  const cleanCount = results.filter((result) => classification(result) === "clean").length;
+  const exceptionCount = results.filter((result) => classification(result) === "exception").length;
+  document.querySelector("#batch-count").textContent = results.length;
+  document.querySelector("#all-count").textContent = results.length;
+  document.querySelector("#attack-count").textContent = attackCount;
+  document.querySelector("#clean-count").textContent = cleanCount;
+  document.querySelector("#exception-count").textContent = exceptionCount;
+  document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
+  document.querySelector("#protected-stopped").textContent = metrics(results, "protected").stopped;
+  document.querySelector("#naive-attack-total").textContent = attackCount;
+  document.querySelector("#protected-attack-total").textContent = attackCount;
 }
 
 function filteredResults() {
@@ -122,7 +135,8 @@ function hydrateSandbox(data) {
   results = runBenchmark(requests, state.fundingAccount);
   accountName.textContent = account.name; accountEnding.textContent = `••${account.mask ?? "test"}`;
   accountBalance.textContent = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.available ?? account.current ?? 0);
-  sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "This available-balance snapshot is used to hold payment requests that exceed the connected funding source.";
+  sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "This current Plaid Sandbox balance snapshot is used to hold payment requests that exceed the connected funding source.";
+  updateScenarioCounts();
   renderList();
 }
 
@@ -145,6 +159,7 @@ document.querySelector(".sidebar nav").addEventListener("click", (event) => {
   if (button.dataset.nav === "sandbox") document.querySelector("#sandbox-context").scrollIntoView({ behavior, block: "start" });
 });
 
+updateScenarioCounts();
 renderList();
 updateReviewProgress();
 loadSandbox();
