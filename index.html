@@ -4,104 +4,72 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="TransferTrust payment-change fraud screening demo" />
-    <title>TransferTrust — controls before money moves</title>
+    <title>TransferTrust — payment change review</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <nav class="topbar" aria-label="Primary navigation">
-        <a class="brand" href="#top" aria-label="TransferTrust home"><span class="brand-mark">↗</span>TransferTrust</a>
-        <span class="nav-status"><i></i> SANDBOX-READY DEMO</span>
-      </nav>
-
-      <section class="hero" id="top">
-        <p class="eyebrow">PAYMENT-CHANGE RISK · PORTFOLIO DEMO</p>
-        <h1>Stop the request<br />before it becomes <em>a transfer.</em></h1>
-        <p class="hero-copy">A transparent control layer for payment requests. Same batch. Same invoices. Measurably different outcome.</p>
-        <div class="hero-footnote">Synthetic scenarios only · No real customer or financial data</div>
-      </section>
-
-      <section class="benchmark" aria-labelledby="benchmark-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">THE BENCHMARK</p>
-            <h2 id="benchmark-title">One batch. Two outcomes.</h2>
-          </div>
-          <p class="caption">30 payment requests &nbsp;·&nbsp; 12 seeded fraud attempts &nbsp;·&nbsp; 16 clean payments</p>
-        </div>
-        <div class="scoreboard">
-          <article class="score-card muted">
-            <p class="score-label">Naive review</p>
-            <strong><span id="naive-stopped">0</span><small>/12</small></strong>
-            <p>fraud attempts stopped</p>
-            <div class="score-detail"><span>Funds sent to attacker accounts</span><b>9</b></div>
-          </article>
-          <div class="arrow" aria-hidden="true">→</div>
-          <article class="score-card protected">
-            <p class="score-label">TransferTrust controls</p>
-            <strong><span id="protected-stopped">12</span><small>/12</small></strong>
-            <p>fraud attempts stopped</p>
-            <div class="score-detail"><span>Clean payments incorrectly held</span><b id="clean-held">0</b></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="plaid-context" aria-labelledby="plaid-title">
-        <div>
-          <p class="eyebrow">OPTIONAL PLAID SANDBOX CONTEXT</p>
-          <h2 id="plaid-title">Use account data as context, not as a decision-maker.</h2>
-          <p>The benchmark remains synthetic and deterministic. This optional Sandbox connection demonstrates how a product could retrieve account context without sending, scheduling, or simulating real money movement.</p>
-        </div>
-        <div class="plaid-card" aria-live="polite">
-          <div class="plaid-card-heading"><span class="plaid-pill">PLAID · SANDBOX</span><span id="plaid-status">Not connected</span></div>
-          <h3 id="plaid-account-name">No test account linked</h3>
-          <p id="plaid-account-detail">Create a server-side Sandbox Item to retrieve test account metadata and balances.</p>
-          <button class="sandbox-button" id="connect-sandbox" type="button">Connect test account <span aria-hidden="true">↗</span></button>
-          <p class="plaid-note">Uses test data only. Credentials and access tokens never reach the browser.</p>
-        </div>
-      </section>
-
-      <section class="workbench" aria-labelledby="workbench-title">
-        <div class="section-heading workbench-heading">
-          <div>
-            <p class="eyebrow">REVIEW WORKBENCH</p>
-            <h2 id="workbench-title">Inspect the evidence.</h2>
-          </div>
-          <div class="legend"><span><i class="dot block"></i> Blocked</span><span><i class="dot hold"></i> Held for review</span><span><i class="dot approve"></i> Approved</span></div>
-        </div>
-        <div class="filters" role="toolbar" aria-label="Filter payment requests">
-          <button class="active" data-filter="all">All requests <span>30</span></button>
-          <button data-filter="attack">Fraud scenarios <span>12</span></button>
-          <button data-filter="clean">Clean payments <span>16</span></button>
-          <button data-filter="exception">Control exceptions <span>2</span></button>
-        </div>
-        <div class="request-layout">
-          <div class="request-list" id="request-list" aria-label="Payment requests"></div>
-          <aside class="detail-panel" id="detail-panel" aria-live="polite">
-            <p class="eyebrow">SELECT A REQUEST</p>
-            <h3>Decision evidence appears here.</h3>
-            <p>Choose any payment request to compare the naive decision with the protected flow.</p>
-          </aside>
-        </div>
-      </section>
-
-      <section class="controls" aria-labelledby="controls-title">
-        <div>
-          <p class="eyebrow">CONTROL DESIGN</p>
-          <h2 id="controls-title">Guard the source of truth.</h2>
-        </div>
-        <div class="control-grid">
-          <article><span>01</span><h3>Screen first</h3><p>Invoice text is screened before any payment decision. A risk signal ends the flow early.</p></article>
-          <article><span>02</span><h3>Verify structurally</h3><p>Payment details are matched to the vendor master—not copied from an untrusted document.</p></article>
-          <article><span>03</span><h3>Leave a receipt</h3><p>Every outcome has a concise, deterministic reason an operator can inspect.</p></article>
-        </div>
-      </section>
-
-      <footer><span>TransferTrust</span><span>Built as an engineering portfolio demonstration · 2026</span></footer>
-    </main>
+    <div class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="#review-queue">TransferTrust<span>.</span></a>
+        <span class="env-tag">Sandbox</span>
+        <span class="run-id">RUN TT-26-1112-01</span>
+        <span class="system-status"><i></i>Systems healthy</span>
+      </header>
+      <aside class="sidebar" aria-label="Product navigation">
+        <nav>
+          <a href="#review-queue"><span class="nav-icon">⌂</span>Overview</a>
+          <a class="active" href="#review-queue"><span class="nav-icon">▤</span>Review queue</a>
+          <a href="#control-summary"><span class="nav-icon">◈</span>Controls</a>
+          <a href="#decision-panel"><span class="nav-icon">▣</span>Audit trail</a>
+          <a href="#sandbox-context"><span class="nav-icon">▥</span>Sandbox account</a>
+        </nav>
+        <div class="sidebar-foot"><span class="live-dot"></span>Demo mode</div>
+      </aside>
+      <main class="workspace" id="review-queue">
+        <section class="queue-area">
+          <header class="queue-header">
+            <p class="section-kicker">OPERATIONS · PAYMENT CONTROLS</p>
+            <h1>Payment change review</h1>
+            <p>Batch 04 · 30 requests awaiting operator review</p>
+          </header>
+          <section class="benchmark-strip" id="control-summary" aria-label="Benchmark results">
+            <div class="benchmark-result naive"><strong>Naive flow:</strong> <span><b id="naive-stopped">0</b> / 12 attacks stopped</span><div class="meter"><i></i></div></div>
+            <div class="benchmark-divider"></div>
+            <div class="benchmark-result protected"><strong>Protected flow:</strong> <span><b id="protected-stopped">12</b> / 12 attacks stopped</span><div class="meter"><i></i></div></div>
+          </section>
+          <section class="queue-tools" aria-label="Review queue controls">
+            <div class="filters" role="toolbar" aria-label="Filter payment requests">
+              <button class="active" data-filter="all">All risk signals <span>30</span></button>
+              <button data-filter="attack">Fraud scenarios <span>12</span></button>
+              <button data-filter="clean">Clean payments <span>16</span></button>
+              <button data-filter="exception">Exceptions <span>2</span></button>
+            </div>
+            <label class="search"><span>⌕</span><input id="filter-search" type="search" placeholder="Search vendor, invoice, or account…" /></label>
+          </section>
+          <section class="queue-table" aria-label="Payment request queue">
+            <div class="table-labels" aria-hidden="true"><span>Vendor</span><span>Invoice ID</span><span>Requested account</span><span>Amount</span><span>Risk signal</span><span>Decision</span></div>
+            <div class="request-list" id="request-list"></div>
+          </section>
+          <section class="sandbox-context" id="sandbox-context" aria-labelledby="sandbox-title">
+            <div class="sandbox-heading"><h2 id="sandbox-title"><span>▥</span> Sandbox account context</h2><span class="test-data">Test data only</span></div>
+            <div class="sandbox-content" aria-live="polite">
+              <div><span>Linked account</span><strong id="plaid-account-name">No test account linked</strong></div>
+              <div><span>Account ending</span><strong id="plaid-account-ending">••••</strong></div>
+              <div><span>Available balance</span><strong id="plaid-account-balance">—</strong></div>
+              <div><span>Status</span><strong class="connection-status" id="plaid-status"><i></i>not connected</strong></div>
+              <button class="connect-button" id="connect-sandbox" type="button">Connect test account</button>
+            </div>
+            <p class="sandbox-detail" id="plaid-account-detail">Account context is optional and never determines a fraud decision.</p>
+          </section>
+        </section>
+        <aside class="decision-panel" id="decision-panel" aria-live="polite">
+          <div class="empty-inspector"><p class="section-kicker">SELECT A REQUEST</p><h2>Decision evidence appears here.</h2><p>Choose a payment request to compare its naive and protected decision paths.</p></div>
+        </aside>
+      </main>
+    </div>
     <script type="module" src="app.js"></script>
   </body>
 </html>

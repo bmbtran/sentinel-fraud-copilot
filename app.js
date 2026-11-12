@@ -2,14 +2,14 @@ import { requests, scenarioLabels } from "./src/data.js";
 import { metrics, runBenchmark } from "./src/risk-engine.js";
 
 const results = runBenchmark(requests);
-const state = { filter: "all", selected: null };
+const firstRisk = results.find((result) => result.request.category === "bank_change");
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null };
 const list = document.querySelector("#request-list");
-const panel = document.querySelector("#detail-panel");
-
+const panel = document.querySelector("#decision-panel");
 const protectedMetrics = metrics(results, "protected");
+
 document.querySelector("#naive-stopped").textContent = metrics(results, "naive").stopped;
 document.querySelector("#protected-stopped").textContent = protectedMetrics.stopped;
-document.querySelector("#clean-held").textContent = protectedMetrics.cleanHeld;
 
 function classification(result) {
   if (result.request.category === "clean") return "clean";
@@ -18,28 +18,31 @@ function classification(result) {
 }
 
 function filteredResults() {
-  return state.filter === "all" ? results : results.filter((result) => classification(result) === state.filter);
+  const query = state.search.trim().toLowerCase();
+  return results.filter((result) => {
+    const matchesFilter = state.filter === "all" || classification(result) === state.filter;
+    const haystack = `${result.request.vendor} ${result.request.invoiceId} ${result.request.account}`.toLowerCase();
+    return matchesFilter && (!query || haystack.includes(query));
+  });
 }
 
 function statusClass(decision) { return decision === "block" ? "block" : decision === "hold" ? "hold" : "approve"; }
+function decisionLabel(decision) { return decision === "block" ? "Blocked" : decision === "hold" ? "Hold" : "Approved"; }
 function currency(value) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
 
 function renderPanel(result) {
   const { request, naive, protected: protectedResult } = result;
   const evidence = request.hiddenText || request.note;
+  const vendorAccount = request.vendorId === "northstar-spoof" ? "No verified vendor record" : request.account;
   panel.innerHTML = `
-    <p class="eyebrow">DECISION TRACE</p>
-    <p class="detail-id">${request.invoiceId} · ${scenarioLabels[request.category]}</p>
-    <h3>${request.vendor}</h3>
-    <div class="decision-compare">
-      <div class="decision"><span class="label">NAIVE REVIEW</span><strong>${naive.decision}</strong><p>${naive.reason}</p></div>
-      <div class="decision protected"><span class="label">PROTECTED FLOW</span><strong>${protectedResult.decision}</strong><p>${protectedResult.reason}</p></div>
-    </div>
-    <div class="evidence">
-      <p><b>Requested account</b><br /><code>${request.account}</code></p>
-      <p><b>Control evidence</b><br /><span class="${protectedResult.decision === "block" ? "danger" : ""}">${evidence}</span></p>
-      <p><b>Applied control</b><br /><code>${protectedResult.guard ?? "none"}</code></p>
-    </div>`;
+    <div class="case-header"><div class="case-header-top"><div><p class="section-kicker">${request.invoiceId} · ${scenarioLabels[request.category].toUpperCase()}</p><h2>${request.vendor}</h2></div><span class="close-mark" aria-hidden="true">×</span></div><div class="case-meta"><span class="case-amount">${currency(request.amount)}</span><span class="decision-pill ${statusClass(protectedResult.decision)}">${decisionLabel(protectedResult.decision)}</span></div></div>
+    <div class="review-path"><div class="path-step">Document<br />screen</div><div class="path-step">Vendor<br />master</div><div class="path-step">Purchase<br />order</div><div class="path-step">Decision</div></div>
+    <section class="case-section"><h3>Evidence</h3><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Document screen:</strong> ${evidence}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Vendor master:</strong> ${vendorAccount}.</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Purchase order:</strong> ${request.amount === request.expectedAmount ? "amount matches the approved purchase order." : "amount differs from the approved purchase order."}</div></div><div class="evidence-row"><span class="evidence-icon">▧</span><div><strong>Decision:</strong> ${protectedResult.reason}</div></div></section>
+    <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
+    <section class="explanation"><h3>Explanation</h3><p>The naive path would <b>${naive.decision}</b> this request. TransferTrust applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
+    <div class="decision-actions" aria-label="Illustrative decision states"><span>⊘ Block</span><span class="selected">Ⅱ ${decisionLabel(protectedResult.decision)}</span><span>✓ Approve</span></div>
+    <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
+    <div class="audit-fields"><div><span>Requested account</span><b>${request.account}</b></div><div><span>Applied control</span><b>${protectedResult.guard ?? "none"}</b></div><div><span>Review mode</span><b>Deterministic demo</b></div></div>`;
 }
 
 function renderList() {
@@ -47,12 +50,8 @@ function renderList() {
   if (!visible.some((result) => result.request.invoiceId === state.selected)) state.selected = visible[0]?.request.invoiceId ?? null;
   list.innerHTML = visible.map((result) => {
     const { request, protected: decision } = result;
-    return `<button class="request ${request.invoiceId === state.selected ? "selected" : ""}" data-id="${request.invoiceId}">
-      <i class="status-dot ${statusClass(decision.decision)}"></i>
-      <span class="request-main"><span class="request-title"><span>${request.vendor}</span><span class="tag">${scenarioLabels[request.category].toUpperCase()}</span></span><span class="request-sub">${request.invoiceId} · ${decision.reason}</span></span>
-      <span class="request-amount">${currency(request.amount)}</span>
-    </button>`;
-  }).join("");
+    return `<button class="request ${request.invoiceId === state.selected ? "selected" : ""}" data-id="${request.invoiceId}"><span class="vendor">${request.vendor}</span><span class="invoice">${request.invoiceId}</span><span class="account">${request.account}</span><span class="amount">${currency(request.amount)}</span><span class="signal">${scenarioLabels[request.category]}</span><span class="decision-pill ${statusClass(decision.decision)}">${decisionLabel(decision.decision)}</span></button>`;
+  }).join("") || `<p class="no-results">No requests match this queue view.</p>`;
   const selected = results.find((result) => result.request.invoiceId === state.selected);
   if (selected) renderPanel(selected);
 }
@@ -64,39 +63,24 @@ document.querySelector(".filters").addEventListener("click", (event) => {
   document.querySelectorAll(".filters button").forEach((item) => item.classList.toggle("active", item === button));
   renderList();
 });
-
-list.addEventListener("click", (event) => {
-  const button = event.target.closest(".request");
-  if (!button) return;
-  state.selected = button.dataset.id;
-  renderList();
-});
-
-renderList();
+document.querySelector("#filter-search").addEventListener("input", (event) => { state.search = event.target.value; renderList(); });
+list.addEventListener("click", (event) => { const button = event.target.closest(".request"); if (!button) return; state.selected = button.dataset.id; renderList(); });
 
 const sandboxButton = document.querySelector("#connect-sandbox");
 const sandboxStatus = document.querySelector("#plaid-status");
 const accountName = document.querySelector("#plaid-account-name");
+const accountEnding = document.querySelector("#plaid-account-ending");
+const accountBalance = document.querySelector("#plaid-account-balance");
 const accountDetail = document.querySelector("#plaid-account-detail");
 
 sandboxButton.addEventListener("click", async () => {
-  sandboxButton.disabled = true;
-  sandboxButton.textContent = "Connecting…";
-  sandboxStatus.textContent = "Connecting";
+  sandboxButton.disabled = true; sandboxButton.textContent = "Connecting…"; sandboxStatus.innerHTML = "<i></i>connecting";
   try {
-    const response = await fetch("/api/plaid/connect-sandbox", { method: "POST" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? "Sandbox connection failed");
-    const account = data.accounts[0];
-    accountName.textContent = account.name;
-    const balance = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.current ?? 0);
-    accountDetail.textContent = `${account.subtype ?? "depository"} · •••• ${account.mask ?? "test"} · current balance ${balance}`;
-    sandboxStatus.textContent = "Test account connected";
-    sandboxButton.textContent = "Sandbox account ready";
-  } catch (error) {
-    sandboxStatus.textContent = "Connection unavailable";
-    accountDetail.textContent = error instanceof Error ? error.message : "Sandbox connection failed.";
-    sandboxButton.disabled = false;
-    sandboxButton.textContent = "Try test connection again";
-  }
+    const response = await fetch("/api/plaid/connect-sandbox", { method: "POST" }); const data = await response.json(); if (!response.ok) throw new Error(data.error ?? "Sandbox connection failed");
+    const account = data.accounts[0]; accountName.textContent = account.name; accountEnding.textContent = `••${account.mask ?? "test"}`;
+    accountBalance.textContent = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.available ?? account.current ?? 0);
+    sandboxStatus.innerHTML = "<i></i>connected"; accountDetail.textContent = "Plaid Sandbox context is connected. Credentials and access tokens remain server-side."; sandboxButton.textContent = "Sandbox account ready";
+  } catch (error) { sandboxStatus.innerHTML = "<i></i>unavailable"; accountDetail.textContent = error instanceof Error ? error.message : "Sandbox connection failed."; sandboxButton.disabled = false; sandboxButton.textContent = "Try test connection again"; }
 });
+
+renderList();
