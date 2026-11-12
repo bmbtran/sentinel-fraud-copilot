@@ -1,35 +1,50 @@
-# TransferTrust
+# Sentinel
 
-**A Plaid Sandbox payment-risk command center.**
+**An explainable AI fraud co-pilot built around Plaid transaction data.**
 
-TransferTrust is an original portfolio prototype that puts a transparent risk decision in front of a Plaid Transfer authorization. It does not create transfers or move money.
+Sentinel builds a personal spending fingerprint, compares deterministic risk rules with Claude’s contextual reasoning, and explains why a transaction was flagged before asking the user to act.
 
-## The demo
+## What is included
 
-1. A synthetic payment enters a command-center stream.
-2. A transparent rules engine scores device sharing, destination fan-in, transaction velocity, and amount signals.
-3. The operator can run a real **Claude document-only** baseline against a fixed 12-case adversarial suite and compare it with **Claude plus deterministic evidence rules**, which stop 12/12 cases. Each run records its model, prompt version, timestamp, and per-case outputs because model behavior can vary across runs.
-4. Only a low-risk fixture may call Plaid Sandbox's Transfer authorization endpoint.
-5. Holds, escalations, and Plaid authorizations append a hash-linked audit event. Transfer creation is intentionally unavailable.
+- Plaid-inspired, responsive command interface with overview, alert center, Trust Lab, and methodology views.
+- Eight realistic, repeatable transaction scenarios across three financial personas.
+- Transparent risk rules for new merchants, amount outliers, unusual timing, duplicates, card testing, velocity, unfamiliar locations, subscription drift, travel context, and unfamiliar cash withdrawals.
+- Hybrid decision policy with risk counterfactuals: “what would make this safer?”
+- Trust Lab that compares a deterministic baseline, contextual AI baseline, and hybrid system on the same labeled scenarios.
+- Optional, server-side live Claude analysis for any selected case.
+- Optional Plaid Sandbox status integration; secrets and access tokens never leave the server.
+- Real SQLite persistence in `data/sentinel.sqlite` for personas, scenarios, user resolutions, and audit events.
 
-## Why Plaid is central
+## Run
 
-Plaid is the authorization boundary, not a decorative account card. The app retrieves a server-side Sandbox funding account and calls `/transfer/authorization/create` only after its risk policy returns `READY_FOR_AUTHORIZATION`. The browser never receives a Plaid access token or secret.
-
-This is a Sandbox-only portfolio demo. A Plaid authorization assesses the linked funding source and ACH authorization; it does not validate a merchant or prove fraud detection is production-ready.
-
-## Run locally
+Requires Node 22.13+ because SQLite uses the built-in `node:sqlite` module.
 
 ```powershell
 npm start
 ```
 
-Open `http://127.0.0.1:4173`. To use the live Sandbox authorization path, add Plaid Sandbox credentials to `.env` using `.env.example` as a guide.
+Open `http://127.0.0.1:4173`.
+
+## Configure optional live services
+
+Copy the variable names in `.env.example` into `.env` and add:
+
+```text
+PLAID_CLIENT_ID=...
+PLAID_SECRET=...
+PLAID_ENV=sandbox
+ANTHROPIC_API_KEY=...
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+```
+
+Without either key, Sentinel still runs as a complete deterministic demo. Plaid Sandbox enables the connection status check. Anthropic enables the **Run live Claude analysis** control in the Alert Center.
+
+## Test
 
 ```powershell
 npm test
 ```
 
-## Architecture inspiration and attribution
+## Safety and evaluation note
 
-The project was rethought after studying the high-level architecture of [Sentinel](https://github.com/Tanisha-dey18/hackathon), an MIT-licensed PayPal hackathon project: a payment-state boundary, evidence-led risk assessment, operator review, relationship intelligence, and auditability. TransferTrust is a clean-room Plaid-oriented implementation: its code, UI, fixtures, risk rules, and terminology were written independently and it does not copy Sentinel source files.
+The Trust Lab uses synthetic, labeled scenarios to make the product’s behavior inspectable. Its metrics are not claims of production fraud performance. Sentinel does not freeze cards, contact issuers, create disputes, or move money.
