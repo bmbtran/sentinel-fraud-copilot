@@ -22,6 +22,7 @@ The Claude score is a recorded evaluation of `claude-haiku-4-5-20251001` on a fi
 - An explainable audit trail for each decision
 - A side-by-side before/after benchmark
 - A server-side Plaid Sandbox funding-readiness check using a live test-account balance
+- A Plaid Transfer Sandbox authorization preflight on policy-approved fixtures
 
 ## Development
 
@@ -47,7 +48,7 @@ Add `ANTHROPIC_API_KEY` to local `.env`. Claude is called server-side only. The 
 
 Copy `.env.example` to `.env` and add a Plaid Sandbox client ID and secret. The local server uses `/sandbox/public_token/create` to create a test Item and `/accounts/get` to retrieve test account context. Credentials and the returned access token remain server-side and are never exposed to the browser.
 
-This integration does **not** initiate transfers. It uses the connected Sandbox account's available balance as a funding-readiness control: a request above available funds is held before release. Fraud decisions remain deterministic and testable, while Plaid provides a live balance snapshot for a distinct operational constraint.
+This integration does **not** initiate transfers. It uses the connected Sandbox account's available balance as a funding-readiness control: a request above available funds is held before release. For a fixture that the local policy approves, the dashboard can also call Plaid's Transfer authorization endpoint as an ACH risk preflight and display Plaid's authorization decision. The transfer-creation endpoint is intentionally absent, so the demo never creates a transfer or moves money. Fraud decisions remain deterministic and testable, while Plaid provides a live operational decision at the release boundary.
 
 ## Design note
 

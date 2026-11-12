@@ -10,7 +10,7 @@ const savedReviews = (() => { try { return JSON.parse(localStorage.getItem("tran
 const savedAgentBenchmark = (() => { try { const saved = JSON.parse(localStorage.getItem("transfer-trust-agent-benchmark") ?? "null"); return Array.isArray(saved?.assessments) ? saved : null; } catch { return null; } })();
 const defaultAlerts = Object.fromEntries(["unverified_destination", "unverified_vendor", "purchase_order_mismatch"].map((category) => [category, "open"]));
 const savedAlerts = (() => { try { return { ...defaultAlerts, ...JSON.parse(localStorage.getItem("transfer-trust-alerts") ?? "{}") }; } catch { return defaultAlerts; } })();
-const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null, agentBenchmark: savedAgentBenchmark ?? recordedAgentBenchmark, benchmarkingAgent: false, controls: savedControls, alerts: savedAlerts, rootRefreshedAt: new Date(), page: "queue" };
+const state = { filter: "all", search: "", selected: firstRisk?.request.invoiceId ?? null, fundingAccount: null, reviews: savedReviews, aiByInvoice: {}, extractingInvoice: null, transferByInvoice: {}, transferLoading: null, agentBenchmark: savedAgentBenchmark ?? recordedAgentBenchmark, benchmarkingAgent: false, controls: savedControls, alerts: savedAlerts, rootRefreshedAt: new Date(), page: "queue" };
 const list = document.querySelector("#request-list");
 const panel = document.querySelector("#decision-panel");
 const reviewProgress = document.querySelector("#review-progress");
@@ -194,6 +194,16 @@ function renderAiProposal(request) {
   return `<section class="ai-proposal"><div class="ai-proposal-head"><div><p class="section-kicker">CLAUDE AGENT · READ-ONLY INVESTIGATION</p><h3>Verified evidence gathered</h3></div><button class="ai-extract-button" type="button" data-run-ai>Run again</button></div><dl class="ai-terms"><div><dt>Vendor</dt><dd>${escapeHtml(terms.vendor)}</dd></div><div><dt>Invoice</dt><dd>${escapeHtml(terms.invoiceId)}</dd></div><div><dt>Amount</dt><dd>${terms.amount == null ? "—" : escapeHtml(currency(terms.amount))}</dd></div><div><dt>Account</dt><dd>${escapeHtml(terms.account)}</dd></div></dl>${tools}<p class="ai-recommendation"><b>Agent recommendation:</b> ${escapeHtml(recommendation)}</p>${terms.suspiciousContent ? `<p class="ai-warning"><b>Agent-noted text:</b> ${escapeHtml(terms.suspiciousContent)}</p>` : ""}<p class="ai-footnote">${escapeHtml(model)} · Tool access is read-only. The deterministic policy still controls approve, hold, and block.</p></section>`;
 }
 
+function renderTransferPreflight(request, decision) {
+  const record = state.transferByInvoice[request.invoiceId];
+  const loading = state.transferLoading === request.invoiceId;
+  if (decision.decision !== "approve") return `<section class="transfer-preflight locked"><p class="section-kicker">PLAID TRANSFER AUTHORIZATION</p><h3>Preflight locked by policy</h3><p>TransferTrust must approve this request before it can ask Plaid Sandbox to risk-authorize an ACH transfer.</p></section>`;
+  if (loading) return `<section class="transfer-preflight"><p class="section-kicker">PLAID TRANSFER AUTHORIZATION</p><h3>Requesting Sandbox authorization…</h3><p>Transfer creation remains disabled in this demo.</p></section>`;
+  if (record?.error) return `<section class="transfer-preflight"><p class="section-kicker">PLAID TRANSFER AUTHORIZATION</p><h3>Preflight unavailable</h3><p>${escapeHtml(record.error)}</p><button class="transfer-button" type="button" data-run-transfer>Try authorization again</button></section>`;
+  if (!record) return `<section class="transfer-preflight"><p class="section-kicker">PLAID TRANSFER AUTHORIZATION</p><h3>Ready for ACH risk preflight</h3><p>Policy has approved this fixture. Ask Plaid Sandbox to authorize it; this creates no transfer and moves no money.</p><button class="transfer-button" type="button" data-run-transfer>Authorize with Plaid Sandbox</button></section>`;
+  return `<section class="transfer-preflight ${record.authorization?.decision === "approved" ? "approved" : "locked"}"><p class="section-kicker">PLAID TRANSFER AUTHORIZATION</p><h3>${escapeHtml(record.authorization?.decision ?? "unknown")} · Plaid Sandbox</h3><p>Authorization ${escapeHtml(record.authorization?.id ?? "not returned")} · Account ${escapeHtml(record.account?.name)} ••${escapeHtml(record.account?.mask ?? "")}</p><p class="transfer-note">${record.authorization?.rationale ? `Rationale: ${escapeHtml(record.authorization.rationale)}.` : "Plaid returned no rationale code."} Transfer creation is intentionally disabled.</p><button class="transfer-button" type="button" data-run-transfer>Re-check authorization</button></section>`;
+}
+
 function renderPanel(result) {
   const { request, protected: protectedResult } = result;
   const agentBaseline = autonomousAgentDecision(request);
@@ -210,6 +220,7 @@ function renderPanel(result) {
     <div class="requested-destination"><span>Requested destination</span><strong>${request.account}</strong></div>
     <section class="explanation"><h3>Explanation</h3><p>${agentBaseline ? `The simulated autonomous agent would <b>${agentBaseline.decision}</b> this request: ${escapeHtml(agentBaseline.reason)}.` : "Evaluate the Claude baseline to see how an autonomous agent would decide this request."} TransferTrust independently applies deterministic controls before release: ${protectedResult.reason.toLowerCase()}.</p></section>
     <div class="summary-card"><h3>Decision summary</h3><p>${decisionLabel(protectedResult.decision)}: ${protectedResult.reason}</p></div>
+    ${renderTransferPreflight(request, protectedResult)}
     ${renderAiProposal(request)}
     <section class="proof-section"><h3>Control trace</h3>${trace}</section>
     <button class="source-document-button" type="button" data-view-document>View source document</button>
@@ -271,12 +282,31 @@ list.addEventListener("click", (event) => { const button = event.target.closest(
 panel.addEventListener("click", (event) => {
   if (event.target.closest("button[data-view-document]")) { openSourceDocument(); return; }
   if (event.target.closest("button[data-run-ai]")) { runClaudeExtraction(); return; }
+  if (event.target.closest("button[data-run-transfer]")) { runTransferPreflight(); return; }
   const button = event.target.closest("button[data-review-action]");
   if (!button || !state.selected) return;
   if (button.dataset.reviewAction === "remove") delete state.reviews[state.selected];
   else state.reviews[state.selected] = { decision: results.find((result) => result.request.invoiceId === state.selected)?.protected.decision, recordedAt: new Date().toISOString() };
   saveReviews(); updateReviewProgress(); renderList();
 });
+async function runTransferPreflight() {
+  const result = results.find((item) => item.request.invoiceId === state.selected);
+  if (!result || result.protected.decision !== "approve" || state.transferLoading) return;
+  const invoiceId = result.request.invoiceId;
+  state.transferLoading = invoiceId;
+  renderPanel(result);
+  try {
+    const response = await fetch("/api/plaid/transfer-preflight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoiceId }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? "Plaid Transfer preflight failed.");
+    state.transferByInvoice[invoiceId] = payload;
+  } catch (error) {
+    state.transferByInvoice[invoiceId] = { error: error instanceof Error ? error.message : "Plaid Transfer preflight failed." };
+  } finally {
+    state.transferLoading = null;
+    renderList();
+  }
+}
 async function runClaudeExtraction() {
   const result = results.find((item) => item.request.invoiceId === state.selected);
   if (!result || state.extractingInvoice) return;

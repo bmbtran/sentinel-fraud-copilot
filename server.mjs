@@ -4,12 +4,13 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { requests, vendorMaster } from "./src/data.js";
+import { protectedDecision } from "./src/risk-engine.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
 const anthropicBaseUrl = "https://api.anthropic.com/v1/messages";
-const sandboxState = { accessToken: null, itemId: null, accounts: [], fundingAccount: null };
+const sandboxState = { accessToken: null, itemId: null, accounts: [], fundingAccount: null, transferAccount: null };
 const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mjs": "text/javascript", ".svg": "image/svg+xml" };
 
 function sendJson(response, status, body) {
@@ -207,7 +208,7 @@ async function connectSandbox() {
   if (!sandboxState.accessToken) {
     const sandboxItem = await plaidPost("/sandbox/public_token/create", {
       institution_id: "ins_109508",
-      initial_products: ["auth", "transactions"],
+      initial_products: ["auth", "transactions", "transfer"],
       options: { transactions: { days_requested: 30 } }
     });
     const exchange = await plaidPost("/item/public_token/exchange", { public_token: sandboxItem.public_token });
@@ -215,13 +216,45 @@ async function connectSandbox() {
     sandboxState.itemId = exchange.item_id;
   }
   const accounts = await plaidPost("/accounts/get", { access_token: sandboxState.accessToken });
-  sandboxState.accounts = accounts.accounts.map(({ name, mask, subtype, balances }) => ({
-    name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
+  sandboxState.accounts = accounts.accounts.map(({ account_id, name, mask, subtype, balances }) => ({
+    id: account_id, name, mask, subtype, current: balances.current, available: balances.available, isoCurrencyCode: balances.iso_currency_code
   }));
   sandboxState.fundingAccount = sandboxState.accounts.find((account) => account.subtype === "cash management" || account.name === "Plaid Cash Management") ?? sandboxState.accounts.find((account) => account.available != null && account.available >= 10000) ?? null;
+  sandboxState.transferAccount = sandboxState.accounts.find((account) => ["checking", "savings"].includes(account.subtype)) ?? sandboxState.fundingAccount;
   return {
     connected: true,
     fundingAccount: sandboxState.fundingAccount
+  };
+}
+
+async function createTransferPreflight(invoiceId) {
+  const request = requests.find((item) => item.invoiceId === invoiceId);
+  if (!request) throw new Error("Fixture request was not found.");
+  await connectSandbox();
+  const policy = protectedDecision(request, vendorMaster, sandboxState.fundingAccount);
+  if (policy.decision !== "approve") throw new Error(`Transfer preflight is locked: policy decision is ${policy.decision}.`);
+  const transferAccount = sandboxState.fundingAccount ?? sandboxState.transferAccount;
+  if (!transferAccount?.id) throw new Error("No Sandbox account is available for a Transfer preflight.");
+  const response = await plaidPost("/transfer/authorization/create", {
+    access_token: sandboxState.accessToken,
+    account_id: transferAccount.id,
+    type: "debit",
+    network: "ach",
+    ach_class: "ppd",
+    amount: request.amount.toFixed(2),
+    user: { legal_name: "TransferTrust Sandbox Operator" },
+    idempotency_key: `fixture-${invoiceId.toLowerCase()}-${transferAccount.id}`
+  });
+  return {
+    invoiceId,
+    account: { name: transferAccount.name, mask: transferAccount.mask },
+    authorization: {
+      id: response.authorization?.id,
+      decision: response.authorization?.decision,
+      rationale: response.authorization?.decision_rationale?.code ?? null,
+      created: response.authorization?.created
+    },
+    transferCreated: false
   };
 }
 
@@ -246,6 +279,21 @@ createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, { environment: "sandbox", connected: false, error: error instanceof Error ? error.message : "Could not connect to Plaid Sandbox" });
     }
+    return;
+  }
+  if (request.method === "POST" && request.url === "/api/plaid/transfer-preflight") {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => { body += chunk; if (body.length > 1000) request.destroy(); });
+    request.on("end", async () => {
+      try {
+        const { invoiceId } = JSON.parse(body);
+        if (typeof invoiceId !== "string") throw new Error("A fixture invoice ID is required.");
+        sendJson(response, 200, await createTransferPreflight(invoiceId));
+      } catch (error) {
+        sendJson(response, 400, { error: error instanceof Error ? error.message : "Plaid Transfer preflight failed" });
+      }
+    });
     return;
   }
   if (request.method === "POST" && request.url === "/api/ai/extract") {
