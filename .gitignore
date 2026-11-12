@@ -8,4 +8,7 @@ server.out.log
 server.err.log
 data/audit-ledger.json
 data/scenarios.json
+data/sentinel.sqlite
+data/sentinel.sqlite-shm
+data/sentinel.sqlite-wal
 
