@@ -73,3 +73,30 @@ list.addEventListener("click", (event) => {
 });
 
 renderList();
+
+const sandboxButton = document.querySelector("#connect-sandbox");
+const sandboxStatus = document.querySelector("#plaid-status");
+const accountName = document.querySelector("#plaid-account-name");
+const accountDetail = document.querySelector("#plaid-account-detail");
+
+sandboxButton.addEventListener("click", async () => {
+  sandboxButton.disabled = true;
+  sandboxButton.textContent = "Connecting…";
+  sandboxStatus.textContent = "Connecting";
+  try {
+    const response = await fetch("/api/plaid/connect-sandbox", { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Sandbox connection failed");
+    const account = data.accounts[0];
+    accountName.textContent = account.name;
+    const balance = new Intl.NumberFormat("en-US", { style: "currency", currency: account.isoCurrencyCode ?? "USD" }).format(account.current ?? 0);
+    accountDetail.textContent = `${account.subtype ?? "depository"} · •••• ${account.mask ?? "test"} · current balance ${balance}`;
+    sandboxStatus.textContent = "Test account connected";
+    sandboxButton.textContent = "Sandbox account ready";
+  } catch (error) {
+    sandboxStatus.textContent = "Connection unavailable";
+    accountDetail.textContent = error instanceof Error ? error.message : "Sandbox connection failed.";
+    sandboxButton.disabled = false;
+    sandboxButton.textContent = "Try test connection again";
+  }
+});

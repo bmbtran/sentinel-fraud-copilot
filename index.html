@@ -14,7 +14,7 @@
     <main class="shell">
       <nav class="topbar" aria-label="Primary navigation">
         <a class="brand" href="#top" aria-label="TransferTrust home"><span class="brand-mark">↗</span>TransferTrust</a>
-        <span class="nav-status"><i></i> DEMO ENVIRONMENT</span>
+        <span class="nav-status"><i></i> SANDBOX-READY DEMO</span>
       </nav>
 
       <section class="hero" id="top">
@@ -46,6 +46,21 @@
             <p>fraud attempts stopped</p>
             <div class="score-detail"><span>Clean payments incorrectly held</span><b id="clean-held">0</b></div>
           </article>
+        </div>
+      </section>
+
+      <section class="plaid-context" aria-labelledby="plaid-title">
+        <div>
+          <p class="eyebrow">OPTIONAL PLAID SANDBOX CONTEXT</p>
+          <h2 id="plaid-title">Use account data as context, not as a decision-maker.</h2>
+          <p>The benchmark remains synthetic and deterministic. This optional Sandbox connection demonstrates how a product could retrieve account context without sending, scheduling, or simulating real money movement.</p>
+        </div>
+        <div class="plaid-card" aria-live="polite">
+          <div class="plaid-card-heading"><span class="plaid-pill">PLAID · SANDBOX</span><span id="plaid-status">Not connected</span></div>
+          <h3 id="plaid-account-name">No test account linked</h3>
+          <p id="plaid-account-detail">Create a server-side Sandbox Item to retrieve test account metadata and balances.</p>
+          <button class="sandbox-button" id="connect-sandbox" type="button">Connect test account <span aria-hidden="true">↗</span></button>
+          <p class="plaid-note">Uses test data only. Credentials and access tokens never reach the browser.</p>
         </div>
       </section>
 

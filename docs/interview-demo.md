@@ -21,6 +21,7 @@ Clarify that all requests and vendors are synthetic. The point is the engineerin
 - **Fixed benchmark.** The result is reproducible and tested rather than a hand-picked dashboard statistic.
 - **Explainability.** Every blocked, held, and approved item exposes the applied control and reason.
 - **Fail-safe behavior.** The vendor master is the source of truth whenever an invoice conflicts with it.
+- **Narrow Plaid boundary.** The Sandbox integration fetches test account context server-side, but it does not authorize, initiate, or simulate money movement. That keeps the API usage relevant without overstating the prototype's safety guarantees.
 
 ## Architecture
 

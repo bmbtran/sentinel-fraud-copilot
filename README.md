@@ -20,13 +20,14 @@ The data is synthetic and the controls are illustrative. This is not a real paym
 - A vendor-master policy that prevents invoice text from changing payout details
 - An explainable audit trail for each decision
 - A side-by-side before/after benchmark
+- An optional server-side Plaid Sandbox connection for test account context
 
 ## Development
 
 This project deliberately uses a dependency-free static dashboard so the demo can run anywhere:
 
 ```powershell
-python -m http.server 4173
+npm start
 ```
 
 Then open `http://localhost:4173`.
@@ -36,6 +37,12 @@ Run the deterministic benchmark tests with:
 ```powershell
 npm test
 ```
+
+### Plaid Sandbox (optional)
+
+Copy `.env.example` to `.env` and add a Plaid Sandbox client ID and secret. The local server uses `/sandbox/public_token/create` to create a test Item and `/accounts/get` to retrieve test account context. Credentials and the returned access token remain server-side and are never exposed to the browser.
+
+This integration does **not** initiate transfers or use bank data to make the fraud decisions. It illustrates a deliberately narrow integration boundary: Plaid account context can enrich a review experience, while the demonstrable fraud controls remain deterministic and testable.
 
 ## Design note
 
