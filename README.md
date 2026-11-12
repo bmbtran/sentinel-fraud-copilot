@@ -1,12 +1,44 @@
 # Sentinel
 
+### A demo app for reviewing suspicious charges with Plaid data, rules, and Claude.
+
 Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel compares a new transaction with the account’s spending history and shows the details that do not fit.
 
- ule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
+This hackathon project uses Claude to explain the context around a charge. Rule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
-## Why 
+## 90-second walkthrough
+
+The repository is meant to be readable before it is run.
+
+1. **Overview** shows Maya Chen's reference profile built from 13 earlier transactions. The screen shows her typical spend, known locations, common merchants, and the charge currently under review.
+2. **Charges to review** opens an $847 purchase from a first-time merchant in Austin at 2:13 AM. Sentinel shows the rule findings behind the alert: small card-testing charges, an amount outside Maya's usual range, and no prior history with the merchant.
+3. Selecting **I don't recognize this** writes a resolution to SQLite and prepares an incident summary. The summary groups the main charge, related micro-charges, and the next step a person can take with their issuer.
+4. **Compare decisions** runs the same labeled scenarios through Rules Only, Claude Only, and the hybrid policy. This view makes disagreements visible instead of treating a model score as an answer.
+
+## Request flow
+
+| User action | Server path | What happens |
+| --- | --- | --- |
+| Open the overview | `GET /api/dashboard` | Loads the seeded scenarios, computes their hybrid assessments, and reads recent resolutions and audit events from SQLite. |
+| Open a charge | `GET /api/scenarios/:id` | Builds a spending reference, evaluates rules, runs the deterministic Claude baseline, and returns the evidence used by the UI. |
+| Mark a charge as unrecognized | `POST /api/scenarios/:id/resolve` | Stores the decision, creates an incident summary from the same evidence, and records both events in SQLite. |
+| Ask Claude for a second read | `POST /api/scenarios/:id/claude` | Sends a minimized, structured context object to the Anthropic Messages API. The response is parsed and validated before it is shown. |
+| Sync Sandbox data | `POST /api/plaid/sync` | Fetches transaction changes with Plaid's cursor-based Transactions Sync endpoint and stores normalized records locally. |
+
+## Source map
+
+The main implementation is small enough to inspect from GitHub:
+
+- [`server.mjs`](server.mjs): HTTP routes, Plaid and Anthropic adapters, request validation, and static serving.
+- [`src/sentinel-core.js`](src/sentinel-core.js): reference profile, rule findings, hybrid risk policy, counterfactuals, incident builder, and benchmark metrics.
+- [`src/sentinel-db.js`](src/sentinel-db.js): SQLite schema and persistence functions.
+- [`src/sentinel-data.js`](src/sentinel-data.js): three personas and eight labeled fraud-review scenarios.
+- [`app.js`](app.js): the client-side review flow.
+- [`tests/sentinel-core.test.mjs`](tests/sentinel-core.test.mjs): checks for card-testing evidence, travel context, and benchmark separation.
+
+## Why we made this
 
 Fraud tooling often has two bad failure modes:
 
@@ -21,7 +53,7 @@ Sentinel is designed around that second of hesitation before an alert becomes no
 
 Sentinel does not claim to solve fraud. It gives people evidence, shows uncertainty when it exists, and prepares a short summary when they do not recognize a charge.
 
-## What happens
+## What happens in the demo
 
 1. Pick a person and a transaction scenario.
 2. Sentinel builds a lightweight spending reference from that person’s history: regular merchants, normal purchase sizes, familiar places, and usual active hours.
@@ -67,7 +99,7 @@ Plaid Transactions / Demo Scenarios
 - **Claude:** optional Anthropic Messages API call for an independent, structured assessment of the selected charge. The live response is validated before display.
 - **Evaluation:** a synthetic, labeled scenario suite that makes the product’s behavior repeatable during a demo.
 
-## Technical choices
+## The technical choices we cared about
 
 **Keep the evidence inspectable.** Each rule records its own name, score contribution, and human-readable detail. The final risk score is never the only explanation.
 
