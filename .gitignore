@@ -4,4 +4,6 @@
 .env.local
 node_modules/
 dist/
+server.out.log
+server.err.log
 

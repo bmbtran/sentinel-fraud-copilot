@@ -31,6 +31,12 @@ python -m http.server 4173
 
 Then open `http://localhost:4173`.
 
+Run the deterministic benchmark tests with:
+
+```powershell
+npm test
+```
+
 ## Design note
 
 TransferTrust is a clean-room portfolio project inspired by the general idea of measuring controls against a fixed adversarial test set. Its implementation, data, and interface are original.
