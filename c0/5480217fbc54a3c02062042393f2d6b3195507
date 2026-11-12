@@ -1,0 +1,34 @@
+server.mjs
+  s_0636dc79126953::t_f119a0b859b0dd 6,126-194,287-297,299,301
+  s_0636dc79126953::t_99d4af8157b7a5 298
+  s_0636dc79126953::t_97bfcbcb184677 300
+index.html
+  s_0636dc79126953::t_f046d76e62cca6 25,82-86
+  s_0636dc79126953::t_247ca995c43705 87
+styles.css
+  s_0636dc79126953::t_c6c0132f710fa7 33-35
+app.js
+  s_0636dc79126953::t_c8775d3ca3ff61 144-160,168,188-190,193-194,287
+  s_0636dc79126953::t_5e6be5dc6611e9 262-268,315,369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c05480217fbc54a3c02062042393f2d6b3195507",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0636dc79126953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cf25-fa71-7f22-b674-27e9abced811",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
