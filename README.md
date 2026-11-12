@@ -1,6 +1,6 @@
 # TransferTrust
 
-**A transparent fraud-screening demo for payment-change requests.**
+**A transparent fraud-screening guardrail for payment-change requests.**
 
 Inspired by Plaid, TransferTrust tests a simple boundary: a document-only AI agent cannot verify facts it cannot see, while deterministic safeguards can compare a request with trusted records before release.
 
