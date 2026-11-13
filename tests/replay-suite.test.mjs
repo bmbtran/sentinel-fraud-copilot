@@ -55,6 +55,36 @@ test("partial-period case rejects an overclaimed monthly conclusion", () => {
   assert.equal(validation.checks.find((check) => check.id === "no_overclaim").pass, false);
 });
 
+test("claim checks treat once as a supported single-purchase statement", () => {
+  const validation = validateFinancialAnswer({
+    caseId: "R02",
+    conclusion: "The posted $6.50 charge replaced the pending record and is counted once.",
+    sourceTransactionIds: ["coffee-posted"],
+    limitations: ["pending_replaced"],
+  });
+  assert.equal(validation.passed, true);
+});
+
+test("overclaim detection permits an explicitly negated monthly conclusion", () => {
+  const validation = validateFinancialAnswer({
+    caseId: "R01",
+    conclusion: "November has lower recorded spending so far, but it is incomplete and does not establish that spending went down this month.",
+    sourceTransactionIds: ["oct-dining", "nov-dining"],
+    limitations: ["partial_period"],
+  });
+  assert.equal(validation.passed, true);
+});
+
+test("claim checks accept equivalent account-scope phrasing", () => {
+  const validation = validateFinancialAnswer({
+    caseId: "R08",
+    conclusion: "Both charges are on different accounts and need confirmation before calling either a duplicate.",
+    sourceTransactionIds: ["books-checking", "books-credit"],
+    limitations: ["needs_confirmation"],
+  });
+  assert.equal(validation.passed, true);
+});
+
 test("every replay case includes a rejected and accepted answer demonstration", () => {
   for (const fixture of replayCases) {
     const demonstration = demonstrateCase(fixture.id);

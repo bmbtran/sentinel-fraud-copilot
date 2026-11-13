@@ -56,7 +56,13 @@ Run all twelve cases:
 npm run benchmark:openai -- --model <your-model-id> --all
 ```
 
-Set a newly issued `OPENAI_API_KEY` in your terminal or `.env`. Results are written locally to `output/benchmarks/` and are intentionally not committed: a result table belongs in the README only after a real run. See [the benchmark protocol](docs/benchmark-protocol.md).
+Set a newly issued `OPENAI_API_KEY` in your terminal or `.env`. Raw response reports are written locally to `output/benchmarks/` and are intentionally not committed. A concise result summary belongs in the README only after a real run. See [the benchmark protocol](docs/benchmark-protocol.md).
+
+### First exploratory run
+
+I ran `gpt-6.1-sol` on all 12 cases in both conditions (24 answers total). After correcting wording-only false negatives in the validator and rescoring the saved responses, raw Sync passed 11/12 contracts and reconciled state passed 10/12. That is a single synthetic run, not a general model-performance claim and not evidence that reconciliation improves a model by itself.
+
+The meaningful failure was R06: in both conditions, the model explained that a transaction had been removed but still cited its obsolete ID as evidence. One reconciled R03 answer also omitted the `merchant_enriched` limitation. Those are the kinds of state and provenance errors the harness is designed to expose. [Run notes and limits](docs/first-openai-run.md)
 
 ## MCP interface
 

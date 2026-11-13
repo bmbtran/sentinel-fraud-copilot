@@ -22,4 +22,4 @@ The report records every raw answer and check result. It reports pass rate by co
 - Publish the case count and both condition pass rates.
 - Include failed cases or link to the saved JSON report.
 - Do not describe a result as fraud detection, live-bank validation, or an OpenAI benchmark.
-- Rerun after changing fixtures, prompts, reducer behavior, or the validator.
+- Rerun after changing fixtures, prompts, reducer behavior, or the validator. If saved answers are rescored after an evaluator fix, label them exploratory and do not use them for a comparative claim.

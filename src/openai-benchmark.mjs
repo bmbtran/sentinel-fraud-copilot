@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { buildAgentTask, replayCases, validateFinancialAnswer } from "./replay-suite.js";
 
 const ANSWER_SCHEMA = {
@@ -100,6 +100,6 @@ async function main() {
   console.log(JSON.stringify({ saved: target, summary: report.summary }, null, 2));
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll("\\", "/")}`).href) {
+if (process.argv[1] && basename(process.argv[1]) === "openai-benchmark.mjs") {
   main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
