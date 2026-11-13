@@ -2,9 +2,31 @@
 
 I started thinking about this while experimenting with Plaid Connector in ChatGPT and Muse. Connecting an account makes transaction history available, but it leaves an important product question open: what should an app show when someone sees a charge they do not recognize?
 
-Sentinel is a prototype for that review step. It is designed around the normalized transaction shape from Plaid’s Transactions Sync flow and compares an unfamiliar charge with prior activity: merchant history, amount, time, location, and nearby transactions. The app keeps the evidence visible so a person can understand why a charge was surfaced before deciding what to do.
+Sentinel is a prototype for that review step. It exposes a narrow MCP interface that gives an AI client transaction context, review evidence, and a controlled way to record a user-confirmed decision. It is designed around the normalized transaction shape from Plaid’s Transactions Sync flow and compares an unfamiliar charge with prior activity: merchant history, amount, time, location, and nearby transactions.
 
 The server creates a Plaid Sandbox item, reads account metadata, ingests transaction changes through the cursor-based Transactions Sync API, normalizes those records, and persists them in SQLite. Deterministic checks handle patterns such as duplicate charges and card testing. Claude produces a separate structured assessment, while the comparison screen shows where rules, model output, and the hybrid policy differ.
+
+## MCP interface
+
+The MCP server is the agent-facing surface of the project. It exposes only the context an agent needs for the synthetic demo and keeps the actual review policy on the server.
+
+| Tool | Purpose | Side effect |
+| --- | --- | --- |
+| `list_review_cases` | Lists synthetic cases, optionally filtered by `alert`, `ask`, or `ignore`. | None |
+| `get_charge_context` | Returns one charge, its spending reference, related activity, and rule findings. | None |
+| `explain_review` | Returns the evidence, counterfactuals, deterministic rule result, and recorded Claude assessment. | None |
+| `record_resolution` | Records a user-confirmed demo decision and prepares a demo incident summary for an unrecognized charge. | Local SQLite write |
+
+`record_resolution` requires `confirmed: true`. It cannot move money, freeze a card, contact an issuer, or submit a dispute. The MCP server deliberately uses the committed model baseline rather than calling a model during a tool call, so the demo is repeatable.
+
+Run it locally:
+
+```powershell
+nvm use 22
+npm run mcp
+```
+
+The Streamable HTTP endpoint is `http://127.0.0.1:8787/mcp`. It is intentionally a local, synthetic-demo server. Before connecting it to real financial data or exposing it publicly, add authentication and deploy it behind HTTPS.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 

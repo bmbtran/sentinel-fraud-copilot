@@ -8,7 +8,12 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
+    "mcp": "node --env-file-if-exists=.env mcp-server.mjs",
     "test": "node --test",
     "record:claude-baseline": "node --env-file-if-exists=.env scripts/record-claude-baseline.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
   }
 }
