@@ -4,13 +4,14 @@ import { stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { audit, initializeDatabase, loadRelayState, saveRelayState } from "./src/relay-db.js";
-import { createRelayEngine, createRelayFixture } from "./src/relay-core.js";
+import { createRelayEngine, createRelayFixture, createRelayReplay, relayReplayCases } from "./src/relay-core.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const plaidBaseUrl = "https://sandbox.plaid.com";
 const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 let sandbox = null;
+let activeReplay = null;
 
 function sendJson(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -78,8 +79,18 @@ function persist() {
 }
 
 function relayOverview() {
+  const overview = engine.overview();
+  const counts = overview.items.reduce((all, item) => ({ ...all, [item.status]: (all[item.status] ?? 0) + 1 }), { healthy: 0, recovery_required: 0, recovery_in_progress: 0 });
   return {
-    ...engine.overview(),
+    ...overview,
+    reliability: {
+      total: overview.items.length,
+      healthy: counts.healthy,
+      actionRequired: counts.recovery_required,
+      inProgress: counts.recovery_in_progress,
+      activeSessions: overview.sessions.filter((entry) => ["issued", "in_progress"].includes(entry.status)).length,
+    },
+    replay: activeReplay,
     sandbox: { configured: configured(), itemReady: Boolean(sandbox) },
     generatedAt: new Date().toISOString(),
   };
@@ -127,10 +138,21 @@ createServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? "/", "http://localhost");
     if (request.method === "GET" && url.pathname === "/api/relay/overview") return sendJson(response, 200, relayOverview());
+    if (request.method === "GET" && url.pathname === "/api/relay/replays") return sendJson(response, 200, { cases: relayReplayCases });
     if (request.method === "POST" && url.pathname === "/api/relay/demo/reset") {
       engine = createRelayFixture();
+      activeReplay = null;
       persist();
       audit("RELAY_DEMO_RESET");
+      return sendJson(response, 200, relayOverview());
+    }
+    if (request.method === "POST" && url.pathname === "/api/relay/demo/replay") {
+      const body = await readBody(request);
+      const replay = createRelayReplay(body.caseId);
+      engine = replay.engine;
+      activeReplay = { ...replay.definition, outcomes: replay.outcomes.map((entry) => entry.outcome) };
+      persist();
+      audit("RELAY_REPLAY_LOADED", { caseId: replay.definition.id, outcomes: activeReplay.outcomes });
       return sendJson(response, 200, relayOverview());
     }
     if (request.method === "POST" && url.pathname === "/api/relay/events") {

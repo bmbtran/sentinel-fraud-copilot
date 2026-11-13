@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRelayEngine } from "../src/relay-core.js";
+import { createRelayEngine, createRelayReplay, relayReplayCases } from "../src/relay-core.js";
 
 const at = (second) => `2026-11-13T09:00:${String(second).padStart(2, "0")}.000Z`;
 const event = (overrides = {}) => ({
@@ -120,4 +120,31 @@ test("RLY-12: a serialized lifecycle state can be restored without exposing toke
   assert.equal(restored.getItem("item-checking").status, "recovery_in_progress");
   assert.equal(restored.sessionsFor("item-checking")[0].status, "issued");
   assert.equal(JSON.stringify(restored.overview()).includes("link-sandbox-secret"), false);
+});
+
+test("RLY-13: the duplicate-delivery replay retains one recovery requirement", () => {
+  const replay = createRelayReplay("duplicate-delivery");
+  assert.equal(replay.outcomes.at(-1).outcome, "duplicate");
+  assert.equal(replay.engine.overview().events.length, 1);
+  assert.equal(replay.engine.getItem("item-credit").status, "recovery_required");
+});
+
+test("RLY-14: the stale-repair replay cannot clear a newer recovery requirement", () => {
+  const replay = createRelayReplay("stale-repair");
+  assert.equal(replay.outcomes.at(-1).outcome, "ignored_stale");
+  assert.equal(replay.engine.getItem("item-credit").status, "recovery_required");
+});
+
+test("RLY-15: the self-heal replay supersedes an open repair session", () => {
+  const replay = createRelayReplay("self-heal");
+  assert.equal(replay.engine.getItem("item-credit").status, "healthy");
+  assert.equal(replay.engine.sessionsFor("item-credit")[0].status, "superseded");
+});
+
+test("RLY-16: each replay case declares the guarded and unsafe comparison", () => {
+  assert.deepEqual(relayReplayCases.map((entry) => entry.id), ["duplicate-delivery", "stale-repair", "self-heal"]);
+  for (const replay of relayReplayCases) {
+    assert.ok(replay.unsafeOutcome.length > 20);
+    assert.ok(replay.guardedOutcome.length > 20);
+  }
 });

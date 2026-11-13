@@ -160,6 +160,9 @@ export function createRelayFixture() {
   const engine = createRelayEngine();
   engine.addItem({ id: "item-checking", label: "First Platypus Checking", status: "healthy" });
   engine.addItem({ id: "item-credit", label: "First Platypus Credit", status: "healthy" });
+  engine.addItem({ id: "item-savings", label: "First Platypus Savings", status: "healthy" });
+  engine.addItem({ id: "item-travel", label: "First Platypus Travel Card", status: "healthy" });
+  engine.addItem({ id: "item-travel", label: "First Platypus Travel Card", status: "healthy" });
   engine.applyEvent({
     eventId: "fixture-pending-disconnect",
     itemId: "item-credit",
@@ -169,4 +172,60 @@ export function createRelayFixture() {
     payload: { source: "fixture" },
   });
   return engine;
+}
+
+export const relayReplayCases = [
+  {
+    id: "duplicate-delivery",
+    label: "Duplicate webhook delivery",
+    summary: "The same login-required signal arrives twice.",
+    unsafeOutcome: "A handler without event idempotency can create two user prompts for one connection issue.",
+    guardedOutcome: "Relay stores the first event and marks the replay as a duplicate, leaving one recovery requirement.",
+  },
+  {
+    id: "stale-repair",
+    label: "Out-of-order repair event",
+    summary: "An older repair signal arrives after a newer connection issue.",
+    unsafeOutcome: "A handler that ignores event timestamps can clear an active problem and leave an Item silently disconnected.",
+    guardedOutcome: "Relay records the older repair event as stale and keeps the newer recovery requirement visible.",
+  },
+  {
+    id: "self-heal",
+    label: "Repair completed elsewhere",
+    summary: "Plaid reports that a login was repaired while an update session is still open.",
+    unsafeOutcome: "A handler without reconciliation can keep showing a user an unnecessary, already-resolved repair prompt.",
+    guardedOutcome: "Relay closes the obsolete work by superseding the active session and returning the Item to healthy.",
+  },
+];
+
+function replayBase() {
+  const engine = createRelayEngine();
+  engine.addItem({ id: "item-checking", label: "First Platypus Checking", status: "healthy" });
+  engine.addItem({ id: "item-credit", label: "First Platypus Credit", status: "healthy" });
+  engine.addItem({ id: "item-savings", label: "First Platypus Savings", status: "healthy" });
+  return engine;
+}
+
+export function createRelayReplay(caseId) {
+  const definition = relayReplayCases.find((entry) => entry.id === caseId);
+  if (!definition) throw new Error("Unknown replay case.");
+  const engine = replayBase();
+  const outcomes = [];
+  const apply = (input) => outcomes.push(engine.applyEvent(input));
+
+  if (caseId === "duplicate-delivery") {
+    const received = { eventId: "replay-duplicate-1", itemId: "item-credit", kind: "ITEM_ERROR", errorCode: "ITEM_LOGIN_REQUIRED", occurredAt: "2026-11-13T09:00:00.000Z", payload: { source: "replay" } };
+    apply(received);
+    apply(received);
+  }
+  if (caseId === "stale-repair") {
+    apply({ eventId: "replay-issue-new", itemId: "item-credit", kind: "ITEM_ERROR", errorCode: "ITEM_LOGIN_REQUIRED", occurredAt: "2026-11-13T09:05:00.000Z", payload: { source: "replay" } });
+    apply({ eventId: "replay-repair-old", itemId: "item-credit", kind: "LOGIN_REPAIRED", occurredAt: "2026-11-13T09:01:00.000Z", payload: { source: "replay" } });
+  }
+  if (caseId === "self-heal") {
+    apply({ eventId: "replay-issue", itemId: "item-credit", kind: "ITEM_ERROR", errorCode: "ITEM_LOGIN_REQUIRED", occurredAt: "2026-11-13T09:00:00.000Z", payload: { source: "replay" } });
+    engine.issueRecovery("item-credit", { mode: "fixture" });
+    apply({ eventId: "replay-repaired", itemId: "item-credit", kind: "LOGIN_REPAIRED", occurredAt: "2026-11-13T09:04:00.000Z", payload: { source: "replay" } });
+  }
+  return { engine, definition, outcomes };
 }

@@ -1,10 +1,10 @@
-# Relay — Plaid Connection Recovery Console
+# Relay — Plaid Connection Reliability Console
 
-I started this after using Plaid Connector and thinking past the initial account-linking moment. A connected Item is not permanently healthy: credentials can change, consent can expire, permissions can change, and the app needs to decide whether the user should return to Link.
+I started this after using Plaid Connector and thinking past the initial account-linking moment. A connected Item is not permanently healthy: credentials can change, consent can expire, permissions can change, and an app needs to decide whether the user should return to Link.
 
-Relay is a small application-side recovery console for that lifecycle. It records connection events, materializes the current Item state, issues one focused Link update session when recovery is needed, and dismisses work that becomes obsolete. It is deliberately narrow: not another banking dashboard and not a replacement for Plaid Link Recovery.
+Relay is a small application-side control plane for that lifecycle. It materializes a fleet view from connection events, makes each recovery decision inspectable, issues one focused Link update session when recovery is needed, and closes work that becomes obsolete. It is deliberately narrow: not another banking dashboard and not a replacement for Plaid Link Recovery.
 
-![Relay connection recovery console showing an Item that needs an update Link session](docs/relay-recovery.png)
+![Relay connection reliability console showing fleet health, current Item state, and replayable connection incidents](docs/relay-recovery.png)
 
 ## What it demonstrates
 
@@ -28,6 +28,16 @@ The console makes the application-side decisions explicit:
 - Supersede an in-progress recovery session if Plaid reports that the login was repaired elsewhere.
 - Keep access tokens and Plaid secrets on the server. The browser only receives a short-lived `link_token` for a real Sandbox Link session.
 
+## The proof surface: incident replays
+
+The main console has three deterministic replays, each framed as an operational failure mode rather than a generic demo action:
+
+- **Duplicate delivery:** the same login-required event arrives twice. Relay records the first event and rejects the replay before a second prompt can be created.
+- **Out-of-order repair:** an older `LOGIN_REPAIRED` event arrives after a newer issue. Relay keeps the current recovery requirement instead of clearing it with stale data.
+- **Repair completed elsewhere:** a newer `LOGIN_REPAIRED` arrives while an update session is open. Relay supersedes the obsolete session and returns the Item to healthy.
+
+Each replay shows the state a naive handler could leave behind alongside the guarded outcome. They are local fixtures, clearly marked in the UI, so the demo does not make claims about production traffic.
+
 ## Why Link update mode
 
 Plaid directs integrations to use update mode for `ITEM_LOGIN_REQUIRED`, `PENDING_EXPIRATION`, and `PENDING_DISCONNECT`; it also sends `LOGIN_REPAIRED` when an Item has healed through another app. Relay is an implementation exercise around those lifecycle signals, rather than a claim that Plaid lacks recovery tooling. See Plaid's [update-mode documentation](https://plaid.com/docs/link/update-mode/).
@@ -49,7 +59,7 @@ If `PLAID_CLIENT_ID` and `PLAID_SECRET` are configured, Relay also exposes a sep
 Fixture event or app-side Plaid signal
   → Relay state reducer
   → SQLite Item / event / recovery-session snapshot
-  → recovery console UI
+  → fleet reliability console and audit trail
   → optional Sandbox Link update session
 ```
 
@@ -82,7 +92,7 @@ PLAID_SECRET=...
 npm test
 ```
 
-The test suite covers login-required and pending-expiration transitions, idempotent event handling, stale self-healing events, single-session enforcement, completion, superseding sessions, and token redaction.
+The test suite covers login-required and pending-expiration transitions, idempotent event handling, stale self-healing events, single-session enforcement, completion, superseding sessions, token redaction, replay-case behavior, and API persistence.
 
 ## Scope and security boundary
 

@@ -1,5 +1,5 @@
 const app = document.querySelector("#app");
-const state = { view: "connections", overview: null, selectedId: "item-credit", activeSession: null, toast: null };
+const state = { view: "reliability", overview: null, replayCases: [], selectedReplayId: "duplicate-delivery", selectedId: "item-credit", activeSession: null, toast: null };
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const label = (value) => String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -13,7 +13,9 @@ async function request(path, options = {}) {
 }
 
 async function refresh() {
-  state.overview = await request("/api/relay/overview");
+  const [overview, replays] = await Promise.all([request("/api/relay/overview"), request("/api/relay/replays")]);
+  state.overview = overview;
+  state.replayCases = replays.cases;
   if (!state.overview.items.some((item) => item.id === state.selectedId)) state.selectedId = state.overview.items[0]?.id;
   draw();
 }
@@ -30,6 +32,11 @@ function header(title, copy, action = "") {
 
 function connectionRow(item) {
   return `<button class="connection-row ${item.id === state.selectedId ? "selected" : ""}" data-item="${escapeHtml(item.id)}"><span class="connection-mark">${escapeHtml(item.label.slice(0, 1))}</span><span><strong>${escapeHtml(item.label)}</strong><small>${item.reason ? label(item.reason) : "Connection is current"}</small></span>${status(item)}</button>`;
+}
+
+function fleetRow(item) {
+  const latest = state.overview.events.find((entry) => entry.itemId === item.id);
+  return `<button class="fleet-row" data-select-item="${escapeHtml(item.id)}"><span><strong>${escapeHtml(item.label)}</strong><small>${latest ? `${label(latest.kind)} · ${timestamp(latest.occurredAt)}` : "No lifecycle events"}</small></span>${status(item)}<span class="fleet-reason">${escapeHtml(item.reason ? label(item.reason) : "Current")}</span></button>`;
 }
 
 function eventRow(event) {
@@ -49,7 +56,17 @@ function renderConnections() {
   if (item.status === "recovery_required") action = `<div class="action-pair"><button class="primary" data-action="recover">${overview.sandbox.configured ? "Launch Sandbox Link" : "Start recovery"}</button>${overview.sandbox.configured ? '<button class="secondary" data-action="fixture-recover">Run fixture repair</button>' : ""}</div>`;
   if (item.status === "recovery_in_progress" && session?.mode === "fixture") action = `<button class="primary" data-action="complete" data-session="${escapeHtml(session.id)}">Complete simulated repair</button>`;
   if (item.status === "recovery_in_progress" && session?.mode === "sandbox") action = `<span class="status progress">Link session issued</span>`;
-  return `<div class="page">${header("Connection recovery, without guesswork.", "Relay records the lifecycle around a Plaid Item and creates one focused update path when the connection needs attention.", '<button class="secondary" data-action="reset">Reset demo</button>')}<section class="summary-strip"><article><span>Items needing action</span><strong>${actionCount}</strong><small>Recovery is only offered when the Item requires it.</small></article><article><span>Active recovery sessions</span><strong>${overview.sessions.filter((entry) => ["issued", "in_progress"].includes(entry.status)).length}</strong><small>Duplicate sessions are blocked by the state machine.</small></article><article><span>Environment</span><strong>${overview.sandbox.configured ? "Sandbox" : "Fixture"}</strong><small>${escapeHtml(sandboxCopy)}</small></article></section><section class="workbench"><aside class="item-list"><div class="list-heading"><h2>Connected Items</h2><span>${overview.items.length}</span></div>${overview.items.map(connectionRow).join("")}</aside><section class="detail-panel"><div class="detail-head"><div><p class="section-label">ITEM STATUS</p><h2>${escapeHtml(item.label)}</h2><p>${item.status === "healthy" ? "No user action is needed." : `Recovery reason: ${label(item.reason)}.`}</p></div>${status(item)}</div><div class="recovery-callout ${item.status === "healthy" ? "quiet" : ""}"><div><strong>${item.status === "healthy" ? "Connection is healthy" : item.status === "recovery_in_progress" ? "Recovery session is active" : "User action is required"}</strong><p>${item.status === "healthy" ? "Relay will retain the event history and wait for a newer lifecycle signal." : item.status === "recovery_in_progress" ? "A second update Link session cannot be issued while this session is active." : "Create a one-time Link update session. The browser receives only a short-lived link token."}</p></div>${action}</div><div class="timeline"><div class="list-heading"><h2>Lifecycle timeline</h2><span>${events.length} events</span></div>${events.length ? events.map(eventRow).join("") : '<p class="empty">No events recorded for this Item.</p>'}</div><div class="demo-controls"><div><h3>Demo controls</h3><p>These controls create clearly labelled local fixture events. They do not send a live Plaid webhook.</p></div><div><button class="secondary" data-action="login-required">Simulate login required</button><button class="secondary" data-action="self-heal">Simulate login repaired</button>${overview.sandbox.configured ? '<button class="secondary" data-action="sandbox-reset">Reset Sandbox login</button>' : ""}</div></div></section></section></div>`;
+  return `<div class="page">${header("Connection recovery", "Relay records the lifecycle around a Plaid Item and creates one focused update path when the connection needs attention.", '<button class="secondary" data-action="reset">Reset demo</button>')}<section class="summary-strip"><article><span>Items needing action</span><strong>${actionCount}</strong><small>Recovery is only offered when the Item requires it.</small></article><article><span>Active recovery sessions</span><strong>${overview.sessions.filter((entry) => ["issued", "in_progress"].includes(entry.status)).length}</strong><small>Duplicate sessions are blocked by the state machine.</small></article><article><span>Environment</span><strong>${overview.sandbox.configured ? "Sandbox" : "Fixture"}</strong><small>${escapeHtml(sandboxCopy)}</small></article></section><section class="workbench"><aside class="item-list"><div class="list-heading"><h2>Connected Items</h2><span>${overview.items.length}</span></div>${overview.items.map(connectionRow).join("")}</aside><section class="detail-panel"><div class="detail-head"><div><p class="section-label">ITEM STATUS</p><h2>${escapeHtml(item.label)}</h2><p>${item.status === "healthy" ? "No user action is needed." : `Recovery reason: ${label(item.reason)}.`}</p></div>${status(item)}</div><div class="recovery-callout ${item.status === "healthy" ? "quiet" : ""}"><div><strong>${item.status === "healthy" ? "Connection is healthy" : item.status === "recovery_in_progress" ? "Recovery session is active" : "User action is required"}</strong><p>${item.status === "healthy" ? "Relay will retain the event history and wait for a newer lifecycle signal." : item.status === "recovery_in_progress" ? "A second update Link session cannot be issued while this session is active." : "Create a one-time Link update session. The browser receives only a short-lived link token."}</p></div>${action}</div><div class="timeline"><div class="list-heading"><h2>Lifecycle timeline</h2><span>${events.length} events</span></div>${events.length ? events.map(eventRow).join("") : '<p class="empty">No events recorded for this Item.</p>'}</div><div class="demo-controls"><div><h3>Demo controls</h3><p>These controls create clearly labelled local fixture events. They do not send a live Plaid webhook.</p></div><div><button class="secondary" data-action="login-required">Simulate login required</button><button class="secondary" data-action="self-heal">Simulate login repaired</button>${overview.sandbox.configured ? '<button class="secondary" data-action="sandbox-reset">Reset Sandbox login</button>' : ""}</div></div></section></section></div>`;
+}
+
+function renderReliability() {
+  const reliability = state.overview.reliability;
+  const selectedReplay = state.replayCases.find((entry) => entry.id === state.selectedReplayId) ?? state.replayCases[0];
+  const activeReplay = state.overview.replay;
+  return `<div class="page reliability-page">${header("Connection reliability", "An operator view for the state after Plaid Link: which Items need attention, why, and whether recovery work is already in flight.", '<button class="secondary" data-action="reset">Restore baseline</button>')}
+  <section class="reliability-summary"><div class="health-summary"><div><span>Fleet health</span><strong>${reliability.healthy} of ${reliability.total}</strong><p>Items currently healthy</p></div><div class="health-bar" aria-label="${reliability.healthy} of ${reliability.total} Items healthy"><i style="width:${reliability.total ? (reliability.healthy / reliability.total) * 100 : 0}%"></i></div></div><div><span>Needs action</span><strong>${reliability.actionRequired}</strong><p>Awaiting an update path</p></div><div><span>In progress</span><strong>${reliability.inProgress}</strong><p>${reliability.activeSessions} active session${reliability.activeSessions === 1 ? "" : "s"}</p></div></section>
+  <section class="operator-grid"><section class="fleet-panel"><div class="panel-heading"><div><h2>Fleet state</h2><p>Current materialized state, not raw webhook volume.</p></div><button class="quiet-button" data-view="connections">Open Item detail</button></div><div class="fleet-list">${state.overview.items.map(fleetRow).join("")}</div></section><section class="signal-panel"><div class="panel-heading"><div><h2>Latest decision</h2><p>${activeReplay ? "Loaded from a labelled local replay." : "Baseline fixture is active."}</p></div>${activeReplay ? '<span class="fixture-badge">Fixture replay</span>' : '<span class="fixture-badge neutral">Baseline</span>'}</div>${activeReplay ? `<h3>${escapeHtml(activeReplay.label)}</h3><p class="signal-copy">${escapeHtml(activeReplay.summary)}</p><dl class="decision-facts"><div><dt>Events evaluated</dt><dd>${activeReplay.outcomes.length}</dd></div><div><dt>Final Item state</dt><dd>${escapeHtml(state.overview.items.find((item) => item.id === "item-credit")?.status.replaceAll("_", " ") ?? "—")}</dd></div></dl><button class="secondary" data-select-item="item-credit" data-view="connections">Inspect the audit trail</button>` : `<h3>Recovery required</h3><p class="signal-copy">The baseline fixture contains one pending disconnect. Open the Item detail to see the reason, event history, and repair path.</p><button class="secondary" data-select-item="item-credit" data-view="connections">Inspect the Item</button>`}</section></section>
+  <section class="replay-panel"><div class="panel-heading"><div><h2>Incident replays</h2><p>Deterministic fixtures that expose the failure mode a naive integration can miss.</p></div></div><div class="replay-layout"><div class="replay-list">${state.replayCases.map((entry) => `<button class="replay-choice ${entry.id === selectedReplay.id ? "selected" : ""}" data-replay="${escapeHtml(entry.id)}"><strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.summary)}</span></button>`).join("")}</div><div class="replay-detail"><h3>${escapeHtml(selectedReplay.label)}</h3><p>${escapeHtml(selectedReplay.summary)}</p><div class="comparison"><div><span>Without the guard</span><p>${escapeHtml(selectedReplay.unsafeOutcome)}</p></div><div><span>Relay's outcome</span><p>${escapeHtml(selectedReplay.guardedOutcome)}</p></div></div><button class="primary" data-action="run-replay" data-replay="${escapeHtml(selectedReplay.id)}">Run this replay</button></div></div></section></div>`;
 }
 
 function renderEvents() {
@@ -63,7 +80,7 @@ function renderAbout() {
 
 function draw() {
   if (!state.overview) return;
-  app.innerHTML = state.view === "events" ? renderEvents() : state.view === "about" ? renderAbout() : renderConnections();
+  app.innerHTML = state.view === "events" ? renderEvents() : state.view === "about" ? renderAbout() : state.view === "connections" ? renderConnections() : renderReliability();
   document.querySelectorAll("[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === state.view));
   const env = document.querySelector("#environment");
   env.textContent = state.overview.sandbox.configured ? "Sandbox ready" : "Fixture mode";
@@ -89,10 +106,15 @@ document.addEventListener("click", async (event) => {
   if (view) { state.view = view.dataset.view; draw(); return; }
   const item = event.target.closest("[data-item]");
   if (item) { state.selectedId = item.dataset.item; draw(); return; }
+  const selectedItem = event.target.closest("[data-select-item]");
+  if (selectedItem) { state.selectedId = selectedItem.dataset.selectItem; if (selectedItem.dataset.view) state.view = selectedItem.dataset.view; draw(); return; }
+  const replay = event.target.closest("[data-replay]");
+  if (replay && !event.target.closest("[data-action]")) { state.selectedReplayId = replay.dataset.replay; draw(); return; }
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
   try {
     if (action === "reset") { await request("/api/relay/demo/reset", { method: "POST" }); state.selectedId = "item-credit"; state.toast = "Fixture timeline reset."; }
+    if (action === "run-replay") { const result = await request("/api/relay/demo/replay", { method: "POST", body: JSON.stringify({ caseId: event.target.closest("[data-replay]").dataset.replay }) }); state.overview = result; state.selectedId = "item-credit"; state.toast = `${result.replay.label} replay loaded.`; }
     if (action === "login-required") { await applyFixture("ITEM_ERROR", "ITEM_LOGIN_REQUIRED"); state.toast = "Simulated ITEM_LOGIN_REQUIRED event recorded."; }
     if (action === "self-heal") { await applyFixture("LOGIN_REPAIRED"); state.toast = "Simulated LOGIN_REPAIRED event recorded."; }
     if (action === "sandbox-reset") { await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/sandbox-reset`, { method: "POST", body: "{}" }); state.toast = "Sandbox login reset and recovery event recorded."; }

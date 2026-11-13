@@ -39,7 +39,7 @@ test("RLY API persists fixture transitions and never returns an access token", a
   try {
     await waitForServer(() => serverOutput.trim());
     const first = await fetch(`http://127.0.0.1:${port}/api/relay/overview`).then((response) => response.json());
-    assert.equal(first.items.length, 2);
+    assert.equal(first.items.length, 4);
     assert.equal(first.items.filter((item) => item.status === "recovery_required").length, 1);
     assert.equal(JSON.stringify(first).includes("access_token"), false);
 
@@ -62,6 +62,12 @@ test("RLY API persists fixture transitions and never returns an access token", a
 
     const reset = await post("/api/relay/demo/reset");
     assert.equal(reset.body.items.filter((item) => item.status === "recovery_required").length, 1);
+
+    const replay = await post("/api/relay/demo/replay", { caseId: "stale-repair" });
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.replay.id, "stale-repair");
+    assert.equal(replay.body.items.find((item) => item.id === "item-credit").status, "recovery_required");
+    assert.equal(replay.body.events.find((event) => event.eventId === "replay-repair-old").outcome, "ignored_stale");
   } finally {
     if (child.exitCode === null) {
       const exited = once(child, "exit");

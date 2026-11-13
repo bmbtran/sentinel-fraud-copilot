@@ -15,18 +15,19 @@
     <div class="shell">
       <header>
         <a class="brand" href="#connections"><span class="brand-mark">R</span>Relay</a>
-        <span class="header-copy">Plaid connection recovery console</span>
+        <span class="header-copy">Plaid connection reliability console</span>
         <span id="environment" class="environment">Loading</span>
       </header>
       <aside>
         <nav aria-label="Primary navigation">
-          <button class="active" data-view="connections">Connections</button>
+          <button class="active" data-view="reliability">Reliability</button>
+          <button data-view="connections">Item detail</button>
           <button data-view="events">Event log</button>
           <button data-view="about">How it works</button>
         </nav>
         <div class="sidebar-note">
-          <strong>Application-side recovery</strong>
-          <span>Track which connected accounts need action, why they need it, and whether a repair session is already active.</span>
+          <strong>After Link succeeds</strong>
+          <span>Track which connected Items need action, why they need it, and whether a repair session is already active.</span>
         </div>
       </aside>
       <main id="app" aria-live="polite"><div class="loading">Loading connection health…</div></main>
