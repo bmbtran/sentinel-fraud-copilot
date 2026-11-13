@@ -6,6 +6,12 @@ Relay is a small application-side control plane for that lifecycle. It materiali
 
 ![Relay connection reliability console showing fleet health, current Item state, and replayable connection incidents](docs/relay-recovery.png)
 
+## Silent walkthrough
+
+![Silent walkthrough: baseline fleet health, an out-of-order repair replay, then the guarded result](docs/relay-demo.gif)
+
+The loop starts from the fleet baseline, selects the out-of-order repair scenario, and loads the guarded replay state.
+
 ## What it demonstrates
 
 The central flow is based on Plaid's update-mode guidance:
