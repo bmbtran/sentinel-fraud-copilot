@@ -1,0 +1,43 @@
+tests/openai-benchmark.test.mjs
+  s_0b84c363e40fea::t_d8664b44ff4693 1-51
+README.md
+  s_0b84c363e40fea::t_4d1932a56f995c 7,15,23-27,43-60,67
+tests/replay-suite.test.mjs
+  s_0b84c363e40fea::t_1c8a32e722b145 67
+docs/benchmark-protocol.md
+  s_0b84c363e40fea::t_4d1932a56f995c 1-25
+src/openai-benchmark.mjs
+  s_0b84c363e40fea::t_08148f218169bf 1-105
+package.json
+  s_0b84c363e40fea::t_4d1932a56f995c 12
+src/replay-suite.js
+  s_0b84c363e40fea::t_c7bfaccbe84fc5 89-155
+  s_0b84c363e40fea::t_54cf05aa3a4faf 202-227,236,244
+  s_0b84c363e40fea::t_0970a883310df1 30,42,54,65,76,88
+.gitignore
+  s_0b84c363e40fea::t_4d1932a56f995c 10
+  s_0b84c363e40fea::t_0ed05a10bb4cca 8
+tests/replay-mcp.test.mjs
+  s_0b84c363e40fea::t_1c8a32e722b145 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "85eb790eff60f967e4aedddd66e5fb131fb0b943",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
