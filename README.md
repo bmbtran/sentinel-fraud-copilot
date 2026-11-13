@@ -4,7 +4,7 @@ I started this after connecting Plaid to ChatGPT and Muse. The analysis was alre
 
 That shifted the question for me. The problem is not how to make another financial chatbot. It is how to test an agent after the transaction record changes.
 
-Plaid Agent Replay Lab replays Plaid-shaped Transactions Sync responses and checks the contract around an agent answer. A valid answer needs to cite transactions that still exist in the current state and disclose limitations such as an incomplete period, a pending-to-posted replacement, a refund, or a removed record.
+Plaid Agent Replay Lab is a compact evaluation harness for that problem. It replays Plaid-shaped Transactions Sync responses, gives an agent either the raw delta stream or a deterministically reconciled current state, then independently scores the resulting answer. A valid answer needs to cite transactions that still exist and disclose limitations such as an incomplete period, a pending-to-posted replacement, a refund, or a removed record.
 
 The project uses synthetic fixtures for expected behavior. The Sandbox integration is separate and shows the real account and cursor-based sync path without claiming that Sandbox transactions have fraud or correctness labels.
 
@@ -12,7 +12,7 @@ The project uses synthetic fixtures for expected behavior. The Sandbox integrati
 
 ## What it tests
 
-The suite covers six cases that are easy to mishandle when an agent works from transaction history:
+The suite covers twelve cases that are easy to mishandle when an agent works from transaction history:
 
 - a partial-period comparison
 - a pending card charge that becomes posted
@@ -20,6 +20,11 @@ The suite covers six cases that are easy to mishandle when an agent works from t
 - a refund that offsets a purchase
 - two identical utility payments that need confirmation
 - a transaction removed by a later sync response
+- a settlement amount changed through `modified`
+- similar charges across two accounts
+- transfer exclusion from a spending total
+- incomplete account coverage
+- recurring-looking charges and a normal posted-purchase control
 
 Each case starts from an empty local state. The harness applies `added`, `modified`, and `removed` changes in cursor order, then exposes only the final transaction state to the answer validator.
 
@@ -35,13 +40,31 @@ The validator does not decide whether an answer sounds good. It checks facts tha
 
 This keeps the evaluation separate from a model score. An agent can use the MCP tools to inspect a case and submit its own structured answer for validation.
 
+## OpenAI benchmark
+
+The optional benchmark runs the same cases twice: first from raw `added` / `modified` / `removed` batches, then from a deterministic current-state reconciliation. It does not use the reference answer or validation contract as model context. Both outputs are scored afterward by the same independent validator.
+
+Run one case before paying for the full suite:
+
+```powershell
+npm run benchmark:openai -- --model <your-model-id> --case R02
+```
+
+Run all twelve cases:
+
+```powershell
+npm run benchmark:openai -- --model <your-model-id> --all
+```
+
+Set a newly issued `OPENAI_API_KEY` in your terminal or `.env`. Results are written locally to `output/benchmarks/` and are intentionally not committed: a result table belongs in the README only after a real run. See [the benchmark protocol](docs/benchmark-protocol.md).
+
 ## MCP interface
 
 The local Streamable HTTP endpoint is `http://127.0.0.1:8787/mcp`.
 
 | Tool | Purpose |
 | --- | --- |
-| `list_replay_cases` | Lists the six synthetic replay cases. |
+| `list_replay_cases` | Lists the twelve synthetic replay cases. |
 | `get_replay_case` | Returns one case's cursor steps, current transactions, coverage, and answer contract. |
 | `validate_financial_answer` | Checks a proposed structured answer against the current replay state. |
 

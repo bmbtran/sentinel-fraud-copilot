@@ -5,7 +5,9 @@
 node_modules/
 .local/
 .playwright-cli/
+.playwright-mcp/
 output/playwright/
+output/benchmarks/
 dist/
 server.out.log
 server.err.log

@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "mcp": "node --env-file-if-exists=.env mcp-server.mjs",
+    "benchmark:openai": "node --env-file-if-exists=.env src/openai-benchmark.mjs",
     "test": "node --test"
   },
   "dependencies": {

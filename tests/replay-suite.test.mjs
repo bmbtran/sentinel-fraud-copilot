@@ -64,7 +64,7 @@ test("every replay case includes a rejected and accepted answer demonstration", 
 });
 
 test("reference contracts pass for every replay case", () => {
-  assert.equal(replayCases.length, 6);
+  assert.equal(replayCases.length, 12);
   const runs = runReferenceSuite();
   assert.equal(runs.length, replayCases.length);
   assert.ok(runs.every((run) => run.passed));

@@ -47,7 +47,7 @@ test("streamable MCP endpoint lists replay tools and validates an answer", async
     assert.deepEqual(listed.result.tools.map((tool) => tool.name).sort(), ["get_replay_case", "list_replay_cases", "validate_financial_answer"]);
     const validation = await rpc(3, "tools/call", {
       name: "validate_financial_answer",
-      arguments: { caseId: "R02", conclusion: "One posted coffee purchase remains.", sourceTransactionIds: ["coffee-posted"], limitations: ["pending_replaced"] },
+      arguments: { caseId: "R02", conclusion: "One posted $6.50 coffee purchase remains; the pending record was replaced.", sourceTransactionIds: ["coffee-posted"], limitations: ["pending_replaced"] },
     });
     assert.equal(validation.result.structuredContent.passed, true);
   } finally {
