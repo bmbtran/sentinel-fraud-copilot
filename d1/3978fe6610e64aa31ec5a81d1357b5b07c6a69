@@ -1,0 +1,59 @@
+tests/replay-suite.test.mjs
+  s_0b84c363e40fea::t_4fcc60e74d61b9 3-8,10-22,24-32,35-43,46-50
+mcp-server.mjs
+  s_0b84c363e40fea::t_d27e14d5d3eca9 3,41
+  s_0b84c363e40fea::t_36f2fea7ac2963 24,57
+app.js
+  s_0b84c363e40fea::t_214c391371b1ef 2-9,14-15,17-18,20,22,24,26,28,30-31,33-34,36-40,42,44-45,47-50,54-55,57-63,66-67
+  s_0b84c363e40fea::t_a7c0e0b05c5bdc 32,51-52
+.gitignore
+  s_0b84c363e40fea::t_bbab34c386644b 15-17
+  s_0b84c363e40fea::t_27db8fa9c25753 6
+src/replay-mcp.js
+  s_0b84c363e40fea::t_d27e14d5d3eca9 3-28
+tests/replay-mcp.test.mjs
+  s_0b84c363e40fea::t_5ed57c2570c822 4,6-17,21,28-33,36-38,40-45,47-50,52-56
+  s_0b84c363e40fea::t_1d82a407aab563 39
+  s_0b84c363e40fea::t_d27e14d5d3eca9 5,18
+  s_0b84c363e40fea::t_c0fdf3705f0c8a 46
+src/replay-db.js
+  s_0b84c363e40fea::t_d27e14d5d3eca9 4-5,8-12,14,16-24
+index.html
+  s_0b84c363e40fea::t_d27aeeed830ee3 8,10,24-25,27,31,34-36,39,41-42,47
+src/replay-suite.js
+  s_0b84c363e40fea::t_c36dc2ccbd4f23 1-10,14-16,20,22-28,30,33-40,42,45-52,54,57-63,65,68-74,76,79-86,88,91-166
+README.md
+  s_0b84c363e40fea::t_fd19a37d02f7ff 1,3,5,7,9,11,13,15-20,22,24,26,28-32,34,36,38,40-44,46,51-59,62,64,66-67,69,72,76,78-82,84,86,98-100,102
+  s_0b84c363e40fea::t_bbab34c386644b 63,65
+server.mjs
+  s_0b84c363e40fea::t_c031bd08e628f2 69
+  s_0b84c363e40fea::t_d27e14d5d3eca9 6
+  s_0b84c363e40fea::t_4a2adf3ccbba22 63,88-89
+  s_0b84c363e40fea::t_b84bcf9d9f954d 7,12,15,17,20,23,26,28,36,39,41,43,50,52,56,59,62,67-68,74-82,92-101,103,105,109,119-125,128-129,131-133
+package.json
+  s_0b84c363e40fea::t_fd19a37d02f7ff 2,12
+  s_0b84c363e40fea::t_833932d4997d4f 3
+package-lock.json
+  s_0b84c363e40fea::t_f2346a712c406f 2-3,8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d13978fe6610e64aa31ec5a81d1357b5b07c6a69",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
