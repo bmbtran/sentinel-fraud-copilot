@@ -1,0 +1,44 @@
+tests/relay-core.test.mjs
+  s_0b84c363e40fea::t_bdc2e1c4f637d2 3,124-150
+server.mjs
+  s_0b84c363e40fea::t_196fbd76dec844 7,14,82-83,85-93,141,144,149-155
+  s_0b84c363e40fea::t_f472aef992802d 156-157
+tests/relay-api.test.mjs
+  s_0b84c363e40fea::t_2432213db2be0f 65-70
+  s_0b84c363e40fea::t_04a76b22825ee2 42
+README.md
+  s_0b84c363e40fea::t_da7ca697a1ed94 1,3,5,7,31-40,62,95
+app.js
+  s_0b84c363e40fea::t_cde871d86862c1 2,16-18,37-41,60-69,83,109-112,117
+  h_d271a4f3bd2ed6 59
+styles.css
+  s_0b84c363e40fea::t_76aa66caa0e600 28-29
+  s_0b84c363e40fea::t_b77041857a4fdd 16
+src/relay-core.js
+  s_0b84c363e40fea::t_eb3d818ec0d3aa 176-231
+  s_0b84c363e40fea::t_365babb97fb32c 163-164
+  s_0b84c363e40fea::t_6f27b5202fd266 165
+index.html
+  s_0b84c363e40fea::t_ba5432cff8544e 18,23-24,29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6019a5c38d8eda3c24a3f393e237eaa776041a17",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
