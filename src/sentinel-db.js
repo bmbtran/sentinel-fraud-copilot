@@ -3,16 +3,103 @@ import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { personas, scenarios } from "./sentinel-data.js";
-const dataDir = fileURLToPath(new URL("../data/", import.meta.url)); mkdirSync(dataDir, { recursive: true }); const db = new DatabaseSync(join(dataDir, "sentinel.sqlite"));
-db.exec("PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS personas (id TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS scenarios (id TEXT PRIMARY KEY, persona_id TEXT NOT NULL, title TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS resolutions (id INTEGER PRIMARY KEY, scenario_id TEXT NOT NULL, decision TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS incidents (id TEXT PRIMARY KEY, scenario_id TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS audit_events (id INTEGER PRIMARY KEY, event TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS plaid_transactions (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);");
-const putPersona = db.prepare("INSERT OR REPLACE INTO personas (id, data) VALUES (?, ?)"); const putScenario = db.prepare("INSERT OR REPLACE INTO scenarios (id, persona_id, title, label, data) VALUES (?, ?, ?, ?, ?)");
-export function audit(event, payload = {}) { db.prepare("INSERT INTO audit_events (event, payload, created_at) VALUES (?, ?, ?)").run(event, JSON.stringify(payload), new Date().toISOString()); }
-export function initializeDatabase() { for (const persona of personas) putPersona.run(persona.id, JSON.stringify(persona)); for (const scenario of scenarios) putScenario.run(scenario.id, scenario.personaId, scenario.title, scenario.label, JSON.stringify(scenario)); audit("DATABASE_READY", { seededScenarios: scenarios.length }); }
-export function listPersonas() { return db.prepare("SELECT data FROM personas ORDER BY id").all().map(({ data }) => JSON.parse(data)); }
-export function listScenarios() { return db.prepare("SELECT data FROM scenarios ORDER BY id").all().map(({ data }) => JSON.parse(data)); }
-export function getScenario(id) { const row = db.prepare("SELECT data FROM scenarios WHERE id = ?").get(id); return row ? JSON.parse(row.data) : null; }
-export function saveResolution(scenarioId, decision, note = "") { const result = db.prepare("INSERT INTO resolutions (scenario_id, decision, note, created_at) VALUES (?, ?, ?, ?)").run(scenarioId, decision, note.slice(0, 280), new Date().toISOString()); audit("ALERT_RESOLVED", { scenarioId, decision }); return db.prepare("SELECT id, scenario_id as scenarioId, decision, note, created_at as createdAt FROM resolutions WHERE id = ?").get(Number(result.lastInsertRowid)); }
-export function saveIncident(incident) { db.prepare("INSERT OR REPLACE INTO incidents (id, scenario_id, data, created_at) VALUES (?, ?, ?, ?)").run(incident.id, incident.scenarioId, JSON.stringify(incident), incident.createdAt); audit("INCIDENT_SUMMARY_PREPARED", { incidentId: incident.id, scenarioId: incident.scenarioId }); return incident; }
-export function recentResolutions() { return db.prepare("SELECT id, scenario_id as scenarioId, decision, note, created_at as createdAt FROM resolutions ORDER BY id DESC LIMIT 8").all(); }
-export function recentAudit() { return db.prepare("SELECT id, event, payload, created_at as createdAt FROM audit_events ORDER BY id DESC LIMIT 12").all().map((row) => ({ ...row, payload: JSON.parse(row.payload) })); }
-export function savePlaidTransactions(transactions) { const statement = db.prepare("INSERT OR REPLACE INTO plaid_transactions (id, data, updated_at) VALUES (?, ?, ?)"); const updatedAt = new Date().toISOString(); for (const transaction of transactions) statement.run(transaction.id, JSON.stringify(transaction), updatedAt); audit("PLAID_TRANSACTIONS_SYNCED", { count: transactions.length }); return db.prepare("SELECT COUNT(*) as count FROM plaid_transactions").get().count; }
+const dataDir = fileURLToPath(new URL("../data/", import.meta.url));
+mkdirSync(dataDir, { recursive: true });
+const db = new DatabaseSync(join(dataDir, "sentinel.sqlite"));
+db.exec(
+  "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS personas (id TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS scenarios (id TEXT PRIMARY KEY, persona_id TEXT NOT NULL, title TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS resolutions (id INTEGER PRIMARY KEY, scenario_id TEXT NOT NULL, decision TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS incidents (id TEXT PRIMARY KEY, scenario_id TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS audit_events (id INTEGER PRIMARY KEY, event TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS plaid_transactions (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL);",
+);
+const putPersona = db.prepare(
+  "INSERT OR REPLACE INTO personas (id, data) VALUES (?, ?)",
+);
+const putScenario = db.prepare(
+  "INSERT OR REPLACE INTO scenarios (id, persona_id, title, label, data) VALUES (?, ?, ?, ?, ?)",
+);
+export function audit(event, payload = {}) {
+  db.prepare(
+    "INSERT INTO audit_events (event, payload, created_at) VALUES (?, ?, ?)",
+  ).run(event, JSON.stringify(payload), new Date().toISOString());
+}
+export function initializeDatabase() {
+  for (const persona of personas)
+    putPersona.run(persona.id, JSON.stringify(persona));
+  for (const scenario of scenarios)
+    putScenario.run(
+      scenario.id,
+      scenario.personaId,
+      scenario.title,
+      scenario.label,
+      JSON.stringify(scenario),
+    );
+  audit("DATABASE_READY", { seededScenarios: scenarios.length });
+}
+export function listPersonas() {
+  return db
+    .prepare("SELECT data FROM personas ORDER BY id")
+    .all()
+    .map(({ data }) => JSON.parse(data));
+}
+export function listScenarios() {
+  return db
+    .prepare("SELECT data FROM scenarios ORDER BY id")
+    .all()
+    .map(({ data }) => JSON.parse(data));
+}
+export function getScenario(id) {
+  const row = db.prepare("SELECT data FROM scenarios WHERE id = ?").get(id);
+  return row ? JSON.parse(row.data) : null;
+}
+export function saveResolution(scenarioId, decision, note = "") {
+  const result = db
+    .prepare(
+      "INSERT INTO resolutions (scenario_id, decision, note, created_at) VALUES (?, ?, ?, ?)",
+    )
+    .run(scenarioId, decision, note.slice(0, 280), new Date().toISOString());
+  audit("ALERT_RESOLVED", { scenarioId, decision });
+  return db
+    .prepare(
+      "SELECT id, scenario_id as scenarioId, decision, note, created_at as createdAt FROM resolutions WHERE id = ?",
+    )
+    .get(Number(result.lastInsertRowid));
+}
+export function saveIncident(incident) {
+  db.prepare(
+    "INSERT OR REPLACE INTO incidents (id, scenario_id, data, created_at) VALUES (?, ?, ?, ?)",
+  ).run(
+    incident.id,
+    incident.scenarioId,
+    JSON.stringify(incident),
+    incident.createdAt,
+  );
+  audit("INCIDENT_SUMMARY_PREPARED", {
+    incidentId: incident.id,
+    scenarioId: incident.scenarioId,
+  });
+  return incident;
+}
+export function recentResolutions() {
+  return db
+    .prepare(
+      "SELECT id, scenario_id as scenarioId, decision, note, created_at as createdAt FROM resolutions ORDER BY id DESC LIMIT 8",
+    )
+    .all();
+}
+export function recentAudit() {
+  return db
+    .prepare(
+      "SELECT id, event, payload, created_at as createdAt FROM audit_events ORDER BY id DESC LIMIT 12",
+    )
+    .all()
+    .map((row) => ({ ...row, payload: JSON.parse(row.payload) }));
+}
+export function savePlaidTransactions(transactions) {
+  const statement = db.prepare(
+    "INSERT OR REPLACE INTO plaid_transactions (id, data, updated_at) VALUES (?, ?, ?)",
+  );
+  const updatedAt = new Date().toISOString();
+  for (const transaction of transactions)
+    statement.run(transaction.id, JSON.stringify(transaction), updatedAt);
+  audit("PLAID_TRANSACTIONS_SYNCED", { count: transactions.length });
+  return db.prepare("SELECT COUNT(*) as count FROM plaid_transactions").get()
+    .count;
+}

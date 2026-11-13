@@ -3,30 +3,397 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initializeDatabase, listPersonas, listScenarios, getScenario, saveResolution, saveIncident, recentResolutions, recentAudit, savePlaidTransactions, audit } from "./src/sentinel-db.js";
+import {
+  initializeDatabase,
+  listPersonas,
+  listScenarios,
+  getScenario,
+  saveResolution,
+  saveIncident,
+  recentResolutions,
+  recentAudit,
+  savePlaidTransactions,
+  audit,
+} from "./src/sentinel-db.js";
 import { assessScenario, buildIncident, metrics } from "./src/sentinel-core.js";
+import {
+  claudeBaseline,
+  recordedClaudeAssessment,
+} from "./src/claude-baseline.js";
 
-const root = fileURLToPath(new URL(".", import.meta.url)); const port = Number(process.env.PORT ?? 4173); const plaidBaseUrl = "https://sandbox.plaid.com";
-const contentTypes = { ".css": "text/css", ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml" }; let accessToken = null; let plaidCursor = null;
-function sendJson(response, status, body) { response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); response.end(JSON.stringify(body)); }
-function credentials() { const { PLAID_CLIENT_ID: client_id, PLAID_SECRET: secret } = process.env; if (!client_id || !secret || client_id.startsWith("your_")) throw new Error("Plaid Sandbox credentials are not configured."); return { client_id, secret }; }
-async function readBody(request) { let text = ""; for await (const chunk of request) { text += chunk; if (text.length > 20_000) throw new Error("Request body is too large."); } return text ? JSON.parse(text) : {}; }
-function dashboard() { const scenarios = listScenarios(); const assessments = scenarios.map((scenario) => ({ scenario, ...assessScenario(scenario) })); return { personas: listPersonas(), scenarios: assessments.map((item) => ({ id: item.scenario.id, personaId: item.scenario.personaId, title: item.scenario.title, label: item.scenario.label, target: item.scenario.target, risk: item.hybrid.score, action: item.hybrid.action })), resolutions: recentResolutions(), audit: recentAudit(), summary: { monitored: scenarios.reduce((sum, scenario) => sum + scenario.history.length + scenario.related.length + 1, 0), alerts: assessments.filter((item) => item.hybrid.action === "alert").length, review: assessments.filter((item) => item.hybrid.action === "ask").length } }; }
-function benchmark() { const results = listScenarios().map((scenario) => ({ scenario, ...assessScenario(scenario) })); return { dataset: { total: results.length, note: "Synthetic, labeled scenarios for a product prototype—not a real-world fraud benchmark." }, engines: ["rules", "claude", "hybrid"].map((engine) => ({ engine, ...metrics(results, engine) })), cases: results.map((result) => ({ id: result.scenario.id, title: result.scenario.title, expected: result.scenario.label, rules: result.rules.score >= 90 ? "fraud" : result.rules.score >= 30 ? "investigate" : "legitimate", claude: result.claude.classification, hybrid: result.hybrid.classification })) }; }
-async function plaidPost(path, data) { const response = await fetch(`${plaidBaseUrl}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...credentials(), ...data }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error_message ?? "Plaid Sandbox request failed."); return payload; }
-async function liveClaudeAssessment(scenario, assessment) { const key = process.env.ANTHROPIC_API_KEY; if (!key || key.startsWith("your_")) throw new Error("Anthropic is not configured. Demo-mode Claude remains available."); const context = { transaction: { merchant: scenario.target.merchant, amount: scenario.target.amount, occurredAt: scenario.target.date, category: scenario.target.category, location: scenario.target.location }, fingerprint: { confidence: assessment.profile.confidence, typicalAmount: assessment.profile.typicalAmount, knownRegions: assessment.profile.regions, topMerchants: assessment.profile.merchants }, ruleFindings: assessment.rules.findings.map(({ code, points, detail }) => ({ code, points, detail })), relatedTransactions: scenario.related.map(({ merchant, amount, date, category, location }) => ({ merchant, amount, date, category, location })) }; const response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: process.env.CLAUDE_MODEL ?? "claude-haiku-4-5-20251001", max_tokens: 320, temperature: 0, system: "You are an explainable fraud-risk analyst for a sandbox prototype. Assess only the structured evidence supplied. Do not assert fraud as fact, give banking advice, or invent facts. Return JSON only with keys classification (fraud|legitimate|investigate), confidence (number 0 to 1), rationale (one concise sentence), supportingSignals (string array), benignExplanations (string array).", messages: [{ role: "user", content: JSON.stringify(context) }] }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error?.message ?? "Claude analysis failed."); const text = payload.content?.find((block) => block.type === "text")?.text; if (!text) throw new Error("Claude returned no text."); const parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, "")); if (!["fraud", "legitimate", "investigate"].includes(parsed.classification) || typeof parsed.rationale !== "string") throw new Error("Claude returned an invalid assessment."); audit("LIVE_CLAUDE_ASSESSMENT", { scenarioId: scenario.id, model: payload.model, classification: parsed.classification }); return { ...parsed, model: payload.model, mode: "live" }; }
-async function plaidStatus() { if (!process.env.PLAID_CLIENT_ID || process.env.PLAID_CLIENT_ID.startsWith("your_")) return { connected: false, mode: "demo" }; if (!accessToken) { const token = await plaidPost("/sandbox/public_token/create", { institution_id: "ins_109508", initial_products: ["transactions"], options: { transactions: { days_requested: 90 } } }); accessToken = (await plaidPost("/item/public_token/exchange", { public_token: token.public_token })).access_token; } const accounts = await plaidPost("/accounts/get", { access_token: accessToken }); return { connected: true, mode: "sandbox", accounts: accounts.accounts.map((account) => ({ name: account.name, mask: account.mask, balance: account.balances.available ?? account.balances.current })) }; }
-async function syncPlaidTransactions() { await plaidStatus(); const all = []; let cursor = plaidCursor; let hasMore = true; while (hasMore) { const page = await plaidPost("/transactions/sync", { access_token: accessToken, cursor: cursor ?? "" }); all.push(...page.added, ...page.modified); cursor = page.next_cursor; hasMore = page.has_more; } plaidCursor = cursor; const normalized = all.map((transaction) => ({ id: transaction.transaction_id, merchant: transaction.merchant_name ?? transaction.name, amount: transaction.amount, date: `${transaction.date}T12:00:00Z`, category: transaction.personal_finance_category?.primary ?? "Other", channel: transaction.payment_channel ?? "other", location: [transaction.location?.city, transaction.location?.region].filter(Boolean).join(", ") || null, pending: transaction.pending, source: "plaid" })); return { received: normalized.length, stored: savePlaidTransactions(normalized) }; }
-async function serveStatic(request, response) { const rawPath = request.url === "/" ? "/index.html" : decodeURIComponent(request.url.split("?")[0]); const filePath = normalize(join(root, rawPath)); if (!filePath.startsWith(root)) return sendJson(response, 403, { error: "Forbidden" }); try { const info = await stat(filePath); if (!info.isFile()) return sendJson(response, 404, { error: "Not found" }); response.writeHead(200, { "Content-Type": `${contentTypes[extname(filePath)] ?? "application/octet-stream"}; charset=utf-8` }); createReadStream(filePath).pipe(response); } catch { sendJson(response, 404, { error: "Not found" }); } }
+const root = fileURLToPath(new URL(".", import.meta.url));
+const port = Number(process.env.PORT ?? 4173);
+const plaidBaseUrl = "https://sandbox.plaid.com";
+const contentTypes = {
+  ".css": "text/css",
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+};
+let accessToken = null;
+let plaidCursor = null;
+function sendJson(response, status, body) {
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  response.end(JSON.stringify(body));
+}
+function credentials() {
+  const { PLAID_CLIENT_ID: client_id, PLAID_SECRET: secret } = process.env;
+  if (!client_id || !secret || client_id.startsWith("your_"))
+    throw new Error("Plaid Sandbox credentials are not configured.");
+  return { client_id, secret };
+}
+async function readBody(request) {
+  let text = "";
+  for await (const chunk of request) {
+    text += chunk;
+    if (text.length > 20_000) throw new Error("Request body is too large.");
+  }
+  return text ? JSON.parse(text) : {};
+}
+function dashboard() {
+  const scenarios = listScenarios();
+  const assessments = scenarios.map((scenario) => ({
+    scenario,
+    ...assessScenario(scenario, recordedClaudeAssessment(scenario.id)),
+  }));
+  return {
+    personas: listPersonas(),
+    scenarios: assessments.map((item) => ({
+      id: item.scenario.id,
+      personaId: item.scenario.personaId,
+      title: item.scenario.title,
+      label: item.scenario.label,
+      target: item.scenario.target,
+      risk: item.hybrid.score,
+      action: item.hybrid.action,
+    })),
+    resolutions: recentResolutions(),
+    audit: recentAudit(),
+    summary: {
+      monitored: scenarios.reduce(
+        (sum, scenario) =>
+          sum + scenario.history.length + scenario.related.length + 1,
+        0,
+      ),
+      alerts: assessments.filter((item) => item.hybrid.action === "alert")
+        .length,
+      review: assessments.filter((item) => item.hybrid.action === "ask").length,
+    },
+  };
+}
+function benchmark() {
+  const results = listScenarios().map((scenario) => ({
+    scenario,
+    ...assessScenario(scenario, recordedClaudeAssessment(scenario.id)),
+  }));
+  return {
+    dataset: {
+      total: results.length,
+      model: claudeBaseline.model,
+      recordedAt: claudeBaseline.recordedAt,
+      promptVersion: claudeBaseline.promptVersion,
+      note: "Eight fixed synthetic cases. Scores are macro-averaged across fraud, investigate, and legitimate; they are not a real-world fraud claim.",
+    },
+    engines: ["rules", "claude", "hybrid"].map((engine) => ({
+      engine,
+      ...metrics(results, engine),
+    })),
+    cases: results.map((result) => ({
+      id: result.scenario.id,
+      title: result.scenario.title,
+      expected: result.scenario.label,
+      rules:
+        result.rules.score >= 90
+          ? "fraud"
+          : result.rules.score >= 30
+            ? "investigate"
+            : "legitimate",
+      claude: result.claude.classification,
+      hybrid: result.hybrid.classification,
+    })),
+  };
+}
+async function plaidPost(path, data) {
+  const response = await fetch(`${plaidBaseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...credentials(), ...data }),
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new Error(payload.error_message ?? "Plaid Sandbox request failed.");
+  return payload;
+}
+async function liveClaudeAssessmentStructured(scenario, assessment) {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key || key.startsWith("your_"))
+    throw new Error(
+      "Anthropic is not configured. The recorded baseline remains available.",
+    );
+  const context = {
+    transaction: {
+      merchant: scenario.target.merchant,
+      amount: scenario.target.amount,
+      occurredAt: scenario.target.date,
+      category: scenario.target.category,
+      location: scenario.target.location,
+    },
+    fingerprint: {
+      confidence: assessment.profile.confidence,
+      typicalAmount: assessment.profile.typicalAmount,
+      knownRegions: assessment.profile.regions,
+      topMerchants: assessment.profile.merchants,
+    },
+    ruleFindings: assessment.rules.findings.map(({ code, points, detail }) => ({
+      code,
+      points,
+      detail,
+    })),
+    relatedTransactions: scenario.related.map(
+      ({ merchant, amount, date, category, location }) => ({
+        merchant,
+        amount,
+        date,
+        category,
+        location,
+      }),
+    ),
+  };
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: process.env.CLAUDE_MODEL ?? "claude-haiku-4-5-20251001",
+      max_tokens: 320,
+      temperature: 0,
+      system:
+        "You are an explainable fraud-risk analyst for a sandbox prototype. Assess only the structured evidence supplied. Do not assert fraud as fact, give banking advice, or invent facts.",
+      tools: [
+        {
+          name: "record_assessment",
+          description:
+            "Record a structured fraud-risk assessment for one transaction.",
+          input_schema: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "classification",
+              "confidence",
+              "rationale",
+              "supportingSignals",
+              "benignExplanations",
+            ],
+            properties: {
+              classification: {
+                type: "string",
+                enum: ["fraud", "legitimate", "investigate"],
+              },
+              confidence: { type: "number", minimum: 0, maximum: 1 },
+              rationale: { type: "string", maxLength: 280 },
+              supportingSignals: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 5,
+              },
+              benignExplanations: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 5,
+              },
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "tool", name: "record_assessment" },
+      messages: [{ role: "user", content: JSON.stringify(context) }],
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok)
+    throw new Error(payload.error?.message ?? "Claude analysis failed.");
+  const parsed = payload.content?.find(
+    (block) => block.type === "tool_use",
+  )?.input;
+  if (
+    !parsed ||
+    !["fraud", "legitimate", "investigate"].includes(parsed.classification) ||
+    typeof parsed.confidence !== "number" ||
+    typeof parsed.rationale !== "string"
+  )
+    throw new Error("Claude returned an invalid assessment.");
+  audit("LIVE_CLAUDE_ASSESSMENT", {
+    scenarioId: scenario.id,
+    model: payload.model,
+    classification: parsed.classification,
+  });
+  return { ...parsed, model: payload.model, mode: "live" };
+}
+async function plaidStatus() {
+  if (
+    !process.env.PLAID_CLIENT_ID ||
+    process.env.PLAID_CLIENT_ID.startsWith("your_")
+  )
+    return { connected: false, mode: "demo" };
+  if (!accessToken) {
+    const token = await plaidPost("/sandbox/public_token/create", {
+      institution_id: "ins_109508",
+      initial_products: ["transactions"],
+      options: { transactions: { days_requested: 90 } },
+    });
+    accessToken = (
+      await plaidPost("/item/public_token/exchange", {
+        public_token: token.public_token,
+      })
+    ).access_token;
+  }
+  const accounts = await plaidPost("/accounts/get", {
+    access_token: accessToken,
+  });
+  return {
+    connected: true,
+    mode: "sandbox",
+    accounts: accounts.accounts.map((account) => ({
+      name: account.name,
+      mask: account.mask,
+      balance: account.balances.available ?? account.balances.current,
+    })),
+  };
+}
+async function syncPlaidTransactions() {
+  await plaidStatus();
+  const all = [];
+  let cursor = plaidCursor;
+  let hasMore = true;
+  while (hasMore) {
+    const page = await plaidPost("/transactions/sync", {
+      access_token: accessToken,
+      cursor: cursor ?? "",
+    });
+    all.push(...page.added, ...page.modified);
+    cursor = page.next_cursor;
+    hasMore = page.has_more;
+  }
+  plaidCursor = cursor;
+  const normalized = all.map((transaction) => ({
+    id: transaction.transaction_id,
+    merchant: transaction.merchant_name ?? transaction.name,
+    amount: transaction.amount,
+    date: `${transaction.date}T12:00:00Z`,
+    category: transaction.personal_finance_category?.primary ?? "Other",
+    channel: transaction.payment_channel ?? "other",
+    location:
+      [transaction.location?.city, transaction.location?.region]
+        .filter(Boolean)
+        .join(", ") || null,
+    pending: transaction.pending,
+    source: "plaid",
+  }));
+  return {
+    received: normalized.length,
+    stored: savePlaidTransactions(normalized),
+  };
+}
+async function serveStatic(request, response) {
+  const rawPath =
+    request.url === "/"
+      ? "/index.html"
+      : decodeURIComponent(request.url.split("?")[0]);
+  const filePath = normalize(join(root, rawPath));
+  if (!filePath.startsWith(root))
+    return sendJson(response, 403, { error: "Forbidden" });
+  try {
+    const info = await stat(filePath);
+    if (!info.isFile()) return sendJson(response, 404, { error: "Not found" });
+    response.writeHead(200, {
+      "Content-Type": `${contentTypes[extname(filePath)] ?? "application/octet-stream"}; charset=utf-8`,
+    });
+    createReadStream(filePath).pipe(response);
+  } catch {
+    sendJson(response, 404, { error: "Not found" });
+  }
+}
 
 initializeDatabase();
-createServer(async (request, response) => { try {
-  if (request.method === "GET" && request.url === "/api/dashboard") return sendJson(response, 200, dashboard());
-  if (request.method === "GET" && request.url === "/api/benchmark") return sendJson(response, 200, benchmark());
-  if (request.method === "GET" && request.url === "/api/plaid/status") return sendJson(response, 200, await plaidStatus());
-  if (request.method === "POST" && request.url === "/api/plaid/sync") return sendJson(response, 200, await syncPlaidTransactions());
-  const detailMatch = request.url?.match(/^\/api\/scenarios\/([^/]+)$/); if (request.method === "GET" && detailMatch) { const scenario = getScenario(detailMatch[1]); if (!scenario) return sendJson(response, 404, { error: "Scenario not found." }); return sendJson(response, 200, { scenario, ...assessScenario(scenario) }); }
-  const resolveMatch = request.url?.match(/^\/api\/scenarios\/([^/]+)\/resolve$/); if (request.method === "POST" && resolveMatch) { const scenario = getScenario(resolveMatch[1]); const input = await readBody(request); if (!scenario) return sendJson(response, 404, { error: "Scenario not found." }); if (!["fraud", "legitimate"].includes(input.decision)) throw new Error("Decision must be fraud or legitimate."); const assessment = assessScenario(scenario); const incident = input.decision === "fraud" ? saveIncident(buildIncident(scenario, assessment)) : null; return sendJson(response, 201, { resolution: saveResolution(scenario.id, input.decision, String(input.note ?? "")), incident }); }
-  const claudeMatch = request.url?.match(/^\/api\/scenarios\/([^/]+)\/claude$/); if (request.method === "POST" && claudeMatch) { const scenario = getScenario(claudeMatch[1]); if (!scenario) return sendJson(response, 404, { error: "Scenario not found." }); return sendJson(response, 200, { assessment: await liveClaudeAssessment(scenario, assessScenario(scenario)) }); }
-  if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed." }); return serveStatic(request, response);
-} catch (error) { audit("REQUEST_FAILED", { message: error instanceof Error ? error.message : "Unknown error" }); return sendJson(response, 400, { error: error instanceof Error ? error.message : "Unexpected error" }); } }).listen(port, "127.0.0.1", () => console.log(`Sentinel ready at http://127.0.0.1:${port}`));
+createServer(async (request, response) => {
+  try {
+    if (request.method === "GET" && request.url === "/api/dashboard")
+      return sendJson(response, 200, dashboard());
+    if (request.method === "GET" && request.url === "/api/benchmark")
+      return sendJson(response, 200, benchmark());
+    if (request.method === "GET" && request.url === "/api/plaid/status")
+      return sendJson(response, 200, await plaidStatus());
+    if (request.method === "POST" && request.url === "/api/plaid/sync")
+      return sendJson(response, 200, await syncPlaidTransactions());
+    const detailMatch = request.url?.match(/^\/api\/scenarios\/([^/]+)$/);
+    if (request.method === "GET" && detailMatch) {
+      const scenario = getScenario(detailMatch[1]);
+      if (!scenario)
+        return sendJson(response, 404, { error: "Scenario not found." });
+      return sendJson(response, 200, {
+        scenario,
+        ...assessScenario(scenario, recordedClaudeAssessment(scenario.id)),
+      });
+    }
+    const resolveMatch = request.url?.match(
+      /^\/api\/scenarios\/([^/]+)\/resolve$/,
+    );
+    if (request.method === "POST" && resolveMatch) {
+      const scenario = getScenario(resolveMatch[1]);
+      const input = await readBody(request);
+      if (!scenario)
+        return sendJson(response, 404, { error: "Scenario not found." });
+      if (!["fraud", "legitimate"].includes(input.decision))
+        throw new Error("Decision must be fraud or legitimate.");
+      const assessment = assessScenario(
+        scenario,
+        recordedClaudeAssessment(scenario.id),
+      );
+      const incident =
+        input.decision === "fraud"
+          ? saveIncident(buildIncident(scenario, assessment))
+          : null;
+      return sendJson(response, 201, {
+        resolution: saveResolution(
+          scenario.id,
+          input.decision,
+          String(input.note ?? ""),
+        ),
+        incident,
+      });
+    }
+    const claudeMatch = request.url?.match(
+      /^\/api\/scenarios\/([^/]+)\/claude$/,
+    );
+    if (request.method === "POST" && claudeMatch) {
+      const scenario = getScenario(claudeMatch[1]);
+      if (!scenario)
+        return sendJson(response, 404, { error: "Scenario not found." });
+      return sendJson(response, 200, {
+        assessment: await liveClaudeAssessmentStructured(
+          scenario,
+          assessScenario(scenario, recordedClaudeAssessment(scenario.id)),
+        ),
+      });
+    }
+    if (request.method !== "GET")
+      return sendJson(response, 405, { error: "Method not allowed." });
+    return serveStatic(request, response);
+  } catch (error) {
+    audit("REQUEST_FAILED", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Unexpected error",
+    });
+  }
+}).listen(port, "127.0.0.1", () =>
+  console.log(`Sentinel ready at http://127.0.0.1:${port}`),
+);
