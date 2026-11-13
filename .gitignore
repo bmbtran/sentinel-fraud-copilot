@@ -11,12 +11,5 @@ output/benchmarks/
 dist/
 server.out.log
 server.err.log
-data/audit-ledger.json
-data/scenarios.json
-data/sentinel.sqlite
-data/sentinel.sqlite-shm
-data/sentinel.sqlite-wal
-data/replay-lab.sqlite
-data/replay-lab.sqlite-shm
-data/replay-lab.sqlite-wal
+data/
 

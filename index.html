@@ -3,50 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="A replay harness for testing AI agents against Plaid Transactions Sync changes."
-    />
-    <title>Plaid Agent Replay Lab</title>
+    <meta name="description" content="Application-side recovery orchestration for Plaid Link updates." />
+    <title>Relay — Plaid Recovery Console</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="shell">
       <header>
-        <a class="brand" href="#overview"
-          ><span class="brand-mark">P</span>Replay Lab</a
-        ><span class="env">PLAID TRANSACTIONS SYNC</span
-        ><span class="header-copy"
-          >Sandbox item · cursor replay · SQLite</span
-        ><span id="connection" class="connection">Checking Plaid…</span>
+        <a class="brand" href="#connections"><span class="brand-mark">R</span>Relay</a>
+        <span class="header-copy">Plaid connection recovery console</span>
+        <span id="environment" class="environment">Loading</span>
       </header>
       <aside>
-        <p class="nav-label">AGENT RELIABILITY</p>
-        <nav>
-          <button class="active" data-view="overview">Overview</button
-          ><button data-view="cases">Replay cases</button
-          ><button data-view="trace">Cursor trace</button
-          ><button data-view="method">Data path</button>
+        <nav aria-label="Primary navigation">
+          <button class="active" data-view="connections">Connections</button>
+          <button data-view="events">Event log</button>
+          <button data-view="about">How it works</button>
         </nav>
         <div class="sidebar-note">
-          <b>For teams building financial agents</b
-          ><span
-            >Test whether an answer is supported by the current transaction
-            state before it reaches a user.</span
-          >
+          <strong>Application-side recovery</strong>
+          <span>Track which connected accounts need action, why they need it, and whether a repair session is already active.</span>
         </div>
       </aside>
-      <main id="app" aria-live="polite">
-        <div class="loading">Loading replay cases…</div>
-      </main>
+      <main id="app" aria-live="polite"><div class="loading">Loading connection health…</div></main>
     </div>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 {
-  "name": "plaid-agent-replay-lab",
-  "version": "0.2.0",
+  "name": "plaid-connection-recovery-console",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,12 +8,6 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
-    "mcp": "node --env-file-if-exists=.env mcp-server.mjs",
-    "benchmark:openai": "node --env-file-if-exists=.env src/openai-benchmark.mjs",
     "test": "node --test"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    "zod": "^4.6.7"
   }
 }

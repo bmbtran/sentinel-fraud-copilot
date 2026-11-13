@@ -1,72 +1,105 @@
 const app = document.querySelector("#app");
-const state = { view: "overview", harness: null, selectedId: "R01", detail: null, plaid: null, syncing: false };
+const state = { view: "connections", overview: null, selectedId: "item-credit", activeSession: null, toast: null };
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const label = (value) => String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-const transaction = (item) => `<tr><td><code>${escapeHtml(item.transaction_id)}</code></td><td>${escapeHtml(item.merchant_name ?? item.original_description ?? "Unenriched merchant")}</td><td>${escapeHtml(item.date)}</td><td>${item.amount < 0 ? "−" : ""}$${Math.abs(item.amount).toFixed(2)}</td><td>${item.pending ? "Pending" : "Posted"}</td></tr>`;
+const timestamp = (value) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 
-async function get(path) {
-  const response = await fetch(path);
+async function request(path, options = {}) {
+  const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Request failed.");
   return data;
 }
 
-async function selectCase(id, render = true) {
-  state.selectedId = id;
-  state.detail = await get(`/api/replay/${id}`);
-  if (render) draw();
+async function refresh() {
+  state.overview = await request("/api/relay/overview");
+  if (!state.overview.items.some((item) => item.id === state.selectedId)) state.selectedId = state.overview.items[0]?.id;
+  draw();
+}
+
+function status(item) {
+  const className = item.status === "healthy" ? "healthy" : item.status === "recovery_in_progress" ? "progress" : "action";
+  const text = item.status === "healthy" ? "Healthy" : item.status === "recovery_in_progress" ? "Recovery in progress" : "Action needed";
+  return `<span class="status ${className}">${text}</span>`;
 }
 
 function header(title, copy, action = "") {
-  return `<div class="page-head"><div><p class="eyebrow">PLAID AGENT REPLAY LAB</p><h1>${title}</h1><p>${copy}</p></div>${action}</div>`;
+  return `<section class="page-head"><div><h1>${title}</h1><p>${copy}</p></div>${action}</section>`;
 }
 
-function renderOverview() {
-  const { summary, runs } = state.harness;
-  const detail = state.detail;
-  const connector = summary.connectorVerification ?? { checksPassed: "—", caseId: "R02", recordedAt: "after restart" };
-  const connectorScore = connector.checksPassed === "—" ? "—" : `${connector.checksPassed}/5`;
-  return `<div class="page">${header("Test the data before you test the answer", "A replay harness for financial agents that receive Plaid transaction data. It checks whether an answer still has valid sources and appropriate limitations after the sync stream changes.", '<button class="primary" data-view="cases">Open replay cases</button>')}<section class="metrics"><article><span>Replay cases</span><b>${summary.total}</b><small>Synthetic Plaid-shaped fixtures</small></article><article><span>Reference contracts</span><b>${summary.passed}/${summary.total}</b><small>Deterministic validation passes</small></article><article><span>Sync operations</span><b>${summary.syncOperations.length}</b><small>Added, modified, removed</small></article><article><span>ChatGPT connector</span><b>${connectorScore}</b><small>${escapeHtml(connector.caseId)} verified ${escapeHtml(connector.recordedAt)}</small></article></section><section class="section-grid"><article class="card focus-alert"><h2>${escapeHtml(detail.question)}</h2><p>${escapeHtml(detail.purpose)}</p><div class="evidence-line">${detail.assertions.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div><button class="outline" data-view="trace">Inspect cursor trace</button></article><article class="card"><h2>Financial claims need more than a plausible answer.</h2><ul class="counterfactuals"><li>Only current transaction IDs may be cited.</li><li>Coverage gaps and data changes must be disclosed.</li><li>Refunds, pending replacements, and removals affect what can be claimed.</li></ul></article></section><section class="card benchmark"><div class="card-head"><div><h2>Reference-contract run</h2><p class="fine-print">These are fixture contracts, not model scores.</p></div></div><div class="table-wrap"><table><thead><tr><th>Case</th><th>Result</th><th>Required coverage behavior</th></tr></thead><tbody>${runs.map((run) => `<tr><td><b>${run.id}</b> ${escapeHtml(run.title)}</td><td><span class="pill legitimate">${run.passed ? "Pass" : "Fail"}</span></td><td>${escapeHtml(run.checks.find((check) => check.id === "limitations").detail)}</td></tr>`).join("")}</tbody></table></div></section></div>`;
+function connectionRow(item) {
+  return `<button class="connection-row ${item.id === state.selectedId ? "selected" : ""}" data-item="${escapeHtml(item.id)}"><span class="connection-mark">${escapeHtml(item.label.slice(0, 1))}</span><span><strong>${escapeHtml(item.label)}</strong><small>${item.reason ? label(item.reason) : "Connection is current"}</small></span>${status(item)}</button>`;
 }
 
-function renderCases() {
-  const rows = state.harness.cases.map((item) => `<button class="scenario-row ${item.id === state.selectedId ? "selected" : ""}" data-case="${item.id}"><span class="row-risk">${item.id}</span><span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.purpose)}</small></span><span class="pill investigate">${item.stepCount} ${item.stepCount === 1 ? "step" : "steps"}</span></button>`).join("");
-  const detail = state.detail;
-  const rejected = detail.demonstrations.rejected;
-  const accepted = detail.demonstrations.accepted;
-  const failedChecks = rejected.checks.filter((check) => !check.pass).map((check) => label(check.id));
-  return `<div class="page">${header("Replay cases", "Each case starts from an empty local state and applies Plaid-shaped sync changes in cursor order.")}<div class="alerts-layout"><section class="card scenario-list"><div class="card-head"><h2>${state.harness.cases.length} cases</h2></div>${rows}</section><section class="card alert-main"><h2>${escapeHtml(detail.title)}</h2><p>${escapeHtml(detail.question)}</p><div class="decision-copy"><h3>Why this exists</h3><p>${escapeHtml(detail.purpose)}</p></div><div class="verification-grid"><section class="verdict reject"><span>Rejected answer</span><strong>${rejected.passed ? "Unexpected pass" : `${failedChecks.length} checks failed`}</strong><p>${escapeHtml(failedChecks.join(", ") || "The answer did not meet this case contract.")}</p></section><section class="verdict accept"><span>Evidence-backed answer</span><strong>${accepted.checks.filter((check) => check.pass).length}/${accepted.checks.length} checks passed</strong><p>${escapeHtml(accepted.referenceConclusion)}</p></section></div><div class="evidence-list">${detail.assertions.map((item) => `<article><div class="signal-dot medium"></div><div><b>Required behavior</b><p>${escapeHtml(item)}</p></div></article>`).join("")}</div><p class="safe-copy">The harness checks an answer contract. It does not generate the answer or determine a real financial outcome.</p><button class="primary" data-view="trace">View the replay trace</button></section></div></div>`;
+function eventRow(event) {
+  const tone = event.outcome === "ignored_stale" ? "muted" : event.kind === "LOGIN_REPAIRED" ? "good" : event.kind === "ITEM_ERROR" ? "urgent" : "neutral";
+  return `<article class="timeline-row"><span class="timeline-dot ${tone}"></span><div><strong>${escapeHtml(label(event.kind))}</strong><p>${escapeHtml(event.errorCode ? label(event.errorCode) : event.outcome === "ignored_stale" ? "Recorded, but older than the current issue" : "Recorded without a recovery action")}</p></div><time>${escapeHtml(timestamp(event.occurredAt))}</time></article>`;
 }
 
-function renderTrace() {
-  const detail = state.detail;
-  const timeline = detail.steps.map((step) => `<article class="card"><p class="eyebrow">CURSOR ${escapeHtml(step.cursor)}</p><div class="trace"><span><i>+</i> Added <b>${step.added.join(", ") || "—"}</b></span><span><i>~</i> Modified <b>${step.modified.join(", ") || "—"}</b></span><span><i>−</i> Removed <b>${step.removed.join(", ") || "—"}</b></span></div><p class="fine-print">Current state: ${step.currentTransactionIds.join(", ") || "no transactions"}</p></article>`).join("");
-  return `<div class="page">${header("Cursor trace", "This is the state an agent should reason over after each Transactions Sync response.", '<button class="outline" data-view="cases">Choose another case</button>')}<section class="method-grid">${timeline}</section><section class="card benchmark"><div class="card-head"><div><p class="eyebrow">FINAL REPLAY STATE</p><h2>Transactions available to cite</h2></div><span class="dataset">${detail.transactions.length} current records</span></div><div class="table-wrap"><table><thead><tr><th>Transaction ID</th><th>Merchant</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${detail.transactions.map(transaction).join("") || '<tr><td colspan="5">No current transactions remain.</td></tr>'}</tbody></table></div><p class="fine-print">Coverage: ${escapeHtml(detail.coverage.start)} through ${escapeHtml(detail.coverage.end)}. Incomplete periods: ${detail.coverage.incompletePeriods.join(", ") || "none"}.</p></section></div>`;
+function renderConnections() {
+  const overview = state.overview;
+  const item = overview.items.find((entry) => entry.id === state.selectedId) ?? overview.items[0];
+  const events = overview.events.filter((entry) => entry.itemId === item.id);
+  const sessions = overview.sessions.filter((entry) => entry.itemId === item.id);
+  const actionCount = overview.items.filter((entry) => entry.status !== "healthy").length;
+  const session = sessions.find((entry) => ["issued", "in_progress"].includes(entry.status));
+  const sandboxCopy = overview.sandbox.configured ? "Sandbox credentials are configured. Relay can issue a real Plaid Link update token." : "Fixture mode is active. Add Sandbox credentials to launch a real Link update session.";
+  let action = "";
+  if (item.status === "recovery_required") action = `<div class="action-pair"><button class="primary" data-action="recover">${overview.sandbox.configured ? "Launch Sandbox Link" : "Start recovery"}</button>${overview.sandbox.configured ? '<button class="secondary" data-action="fixture-recover">Run fixture repair</button>' : ""}</div>`;
+  if (item.status === "recovery_in_progress" && session?.mode === "fixture") action = `<button class="primary" data-action="complete" data-session="${escapeHtml(session.id)}">Complete simulated repair</button>`;
+  if (item.status === "recovery_in_progress" && session?.mode === "sandbox") action = `<span class="status progress">Link session issued</span>`;
+  return `<div class="page">${header("Connection recovery, without guesswork.", "Relay records the lifecycle around a Plaid Item and creates one focused update path when the connection needs attention.", '<button class="secondary" data-action="reset">Reset demo</button>')}<section class="summary-strip"><article><span>Items needing action</span><strong>${actionCount}</strong><small>Recovery is only offered when the Item requires it.</small></article><article><span>Active recovery sessions</span><strong>${overview.sessions.filter((entry) => ["issued", "in_progress"].includes(entry.status)).length}</strong><small>Duplicate sessions are blocked by the state machine.</small></article><article><span>Environment</span><strong>${overview.sandbox.configured ? "Sandbox" : "Fixture"}</strong><small>${escapeHtml(sandboxCopy)}</small></article></section><section class="workbench"><aside class="item-list"><div class="list-heading"><h2>Connected Items</h2><span>${overview.items.length}</span></div>${overview.items.map(connectionRow).join("")}</aside><section class="detail-panel"><div class="detail-head"><div><p class="section-label">ITEM STATUS</p><h2>${escapeHtml(item.label)}</h2><p>${item.status === "healthy" ? "No user action is needed." : `Recovery reason: ${label(item.reason)}.`}</p></div>${status(item)}</div><div class="recovery-callout ${item.status === "healthy" ? "quiet" : ""}"><div><strong>${item.status === "healthy" ? "Connection is healthy" : item.status === "recovery_in_progress" ? "Recovery session is active" : "User action is required"}</strong><p>${item.status === "healthy" ? "Relay will retain the event history and wait for a newer lifecycle signal." : item.status === "recovery_in_progress" ? "A second update Link session cannot be issued while this session is active." : "Create a one-time Link update session. The browser receives only a short-lived link token."}</p></div>${action}</div><div class="timeline"><div class="list-heading"><h2>Lifecycle timeline</h2><span>${events.length} events</span></div>${events.length ? events.map(eventRow).join("") : '<p class="empty">No events recorded for this Item.</p>'}</div><div class="demo-controls"><div><h3>Demo controls</h3><p>These controls create clearly labelled local fixture events. They do not send a live Plaid webhook.</p></div><div><button class="secondary" data-action="login-required">Simulate login required</button><button class="secondary" data-action="self-heal">Simulate login repaired</button>${overview.sandbox.configured ? '<button class="secondary" data-action="sandbox-reset">Reset Sandbox login</button>' : ""}</div></div></section></section></div>`;
 }
 
-function renderMethod() {
-  const status = state.plaid?.connected ? `Sandbox connected to ${state.plaid.accounts.length} account(s).` : "Demo fixtures are available without credentials.";
-  return `<div class="page">${header("Data path", "The harness uses the same data-change semantics an agent sees after Plaid Transactions Sync.")}<section class="method-grid"><article class="card"><h2>Transactions Sync replay</h2><p>Every fixture applies added, modified, and removed records in cursor order. A modified record updates state; it is not a second transaction.</p></article><article class="card"><h2>Answer contract</h2><p>An agent must cite current transaction IDs and disclose fixture-specific limitations before its answer passes validation.</p></article><article class="card"><h2>SQLite + Sandbox</h2><p>Sandbox sync records are normalized and stored locally. The replay suite stays synthetic so expected behavior is repeatable.</p><button class="outline ai-button" data-sync ${state.syncing ? "disabled" : ""}>${state.syncing ? "Syncing…" : "Sync Plaid Sandbox data"}</button><p class="fine-print">${escapeHtml(status)}</p></article><article class="card"><h2>MCP interface</h2><p>ChatGPT or another client can list cases, inspect a replay state, and validate a proposed structured answer through three read-only tools.</p></article></section></div>`;
+function renderEvents() {
+  const events = state.overview.events;
+  return `<div class="page">${header("Event ledger", "Append-only connection events make recovery decisions explainable. A duplicate event is not allowed to produce a second repair flow.")}<section class="ledger"><div class="ledger-head"><span>Event</span><span>Item</span><span>Outcome</span><span>Time</span></div>${events.map((event) => { const item = state.overview.items.find((entry) => entry.id === event.itemId); return `<div class="ledger-row"><strong>${escapeHtml(label(event.kind))}</strong><span>${escapeHtml(item?.label ?? event.itemId)}</span><span class="event-outcome ${escapeHtml(event.outcome)}">${escapeHtml(label(event.outcome))}</span><time>${escapeHtml(timestamp(event.occurredAt))}</time></div>`; }).join("")}</section></div>`;
+}
+
+function renderAbout() {
+  return `<div class="page">${header("A narrow control plane for Link recovery.", "Relay models the application work that happens after an Item is initially connected.")}<section class="explain-grid"><article><h2>1. Persist the signal</h2><p>Every recovery-relevant event is stored with an idempotency key and a timestamp. Replayed webhooks do not create another user prompt.</p></article><article><h2>2. Choose one action</h2><p>Only known recovery signals create an update path. A healthy Item cannot receive an unnecessary update Link session.</p></article><article><h2>3. Close obsolete work</h2><p>A newer self-healing signal clears the prompt and supersedes an unfinished recovery session.</p></article></section><section class="flow-panel"><h2>Recovery state machine</h2><div class="flow"><span>Healthy</span><i></i><span>Action needed</span><i></i><span>Update Link</span><i></i><span>Healthy</span></div><p>Relay is a Sandbox demonstration of application-side orchestration. It does not replace Plaid Link Recovery, production webhook verification, or a production support workflow.</p></section></div>`;
 }
 
 function draw() {
-  app.innerHTML = state.view === "cases" ? renderCases() : state.view === "trace" ? renderTrace() : state.view === "method" ? renderMethod() : renderOverview();
+  if (!state.overview) return;
+  app.innerHTML = state.view === "events" ? renderEvents() : state.view === "about" ? renderAbout() : renderConnections();
   document.querySelectorAll("[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === state.view));
-  const connection = document.querySelector("#connection");
-  if (connection) connection.textContent = state.plaid?.connected ? "Plaid Sandbox ready" : "Fixture mode";
+  const env = document.querySelector("#environment");
+  env.textContent = state.overview.sandbox.configured ? "Sandbox ready" : "Fixture mode";
+  env.className = `environment ${state.overview.sandbox.configured ? "ready" : ""}`;
+  if (state.toast) { const notice = document.createElement("div"); notice.className = "toast"; notice.textContent = state.toast; document.body.append(notice); setTimeout(() => notice.remove(), 3200); state.toast = null; }
+}
+
+async function applyFixture(kind, errorCode = null) {
+  const itemId = state.selectedId;
+  await request("/api/relay/events", { method: "POST", body: JSON.stringify({ eventId: `browser-${kind}-${Date.now()}`, itemId, kind, errorCode, occurredAt: new Date().toISOString(), payload: { source: "browser_fixture" } }) });
+  await refresh();
+}
+
+async function openSandboxLink(linkToken, sessionId) {
+  if (!window.Plaid) throw new Error("Plaid Link could not load. Check your network connection and try again.");
+  await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/update-started`, { method: "POST", body: JSON.stringify({ sessionId }) });
+  const handler = window.Plaid.create({ token: linkToken, onSuccess: async () => { await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/update-completed`, { method: "POST", body: JSON.stringify({ sessionId }) }); state.toast = "Sandbox update completed. The connection is healthy again."; await refresh(); }, onExit: async () => { state.toast = "Link was closed. The recovery session remains active."; await refresh(); } });
+  handler.open();
 }
 
 document.addEventListener("click", async (event) => {
   const view = event.target.closest("[data-view]");
   if (view) { state.view = view.dataset.view; draw(); return; }
-  const replay = event.target.closest("[data-case]");
-  if (replay) { await selectCase(replay.dataset.case); return; }
-  if (event.target.closest("[data-sync]") && !state.syncing) {
-    state.syncing = true; draw();
-    try { await fetch("/api/plaid/sync", { method: "POST" }); state.plaid = await get("/api/plaid/status"); }
-    finally { state.syncing = false; draw(); }
-  }
+  const item = event.target.closest("[data-item]");
+  if (item) { state.selectedId = item.dataset.item; draw(); return; }
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  if (!action) return;
+  try {
+    if (action === "reset") { await request("/api/relay/demo/reset", { method: "POST" }); state.selectedId = "item-credit"; state.toast = "Fixture timeline reset."; }
+    if (action === "login-required") { await applyFixture("ITEM_ERROR", "ITEM_LOGIN_REQUIRED"); state.toast = "Simulated ITEM_LOGIN_REQUIRED event recorded."; }
+    if (action === "self-heal") { await applyFixture("LOGIN_REPAIRED"); state.toast = "Simulated LOGIN_REPAIRED event recorded."; }
+    if (action === "sandbox-reset") { await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/sandbox-reset`, { method: "POST", body: "{}" }); state.toast = "Sandbox login reset and recovery event recorded."; }
+    if (action === "recover" || action === "fixture-recover") { const result = await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/update-link`, { method: "POST", body: JSON.stringify({ mode: action === "fixture-recover" ? "fixture" : "sandbox" }) }); if (result.mode === "sandbox") await openSandboxLink(result.linkToken, result.session.id); else { state.activeSession = result.session.id; state.toast = "Fixture recovery session issued."; } }
+    if (action === "complete") { await request(`/api/relay/items/${encodeURIComponent(state.selectedId)}/update-completed`, { method: "POST", body: JSON.stringify({ sessionId: event.target.closest("[data-session]").dataset.session }) }); state.toast = "Fixture repair completed."; }
+    await refresh();
+  } catch (error) { state.toast = error.message; draw(); }
 });
 
-Promise.all([get("/api/harness"), get("/api/plaid/status")]).then(async ([harness, plaid]) => { state.harness = harness; state.plaid = plaid; await selectCase(state.selectedId, false); draw(); }).catch((error) => { app.innerHTML = `<div class="page"><h1>Could not load the replay lab</h1><p>${escapeHtml(error.message)}</p></div>`; });
+refresh().catch((error) => { app.innerHTML = `<div class="error"><h1>Relay could not start</h1><p>${escapeHtml(error.message)}</p></div>`; });

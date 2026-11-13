@@ -1,105 +1,64 @@
-# Plaid Agent Replay Lab
+# Relay — Plaid Connection Recovery Console
 
-I started this after connecting Plaid to ChatGPT and Muse. The analysis was already useful: ChatGPT could state the accounts and dates it had, distinguish a partial month from a complete one, cite transactions, and avoid treating transfers as ordinary spending.
+I started this after using Plaid Connector and thinking past the initial account-linking moment. A connected Item is not permanently healthy: credentials can change, consent can expire, permissions can change, and the app needs to decide whether the user should return to Link.
 
-That shifted the question for me. The problem is not how to make another financial chatbot. It is how to test an agent after the transaction record changes.
+Relay is a small application-side recovery console for that lifecycle. It records connection events, materializes the current Item state, issues one focused Link update session when recovery is needed, and dismisses work that becomes obsolete. It is deliberately narrow: not another banking dashboard and not a replacement for Plaid Link Recovery.
 
-Plaid Agent Replay Lab is a compact evaluation harness for that problem. It replays Plaid-shaped Transactions Sync responses, gives an agent either the raw delta stream or a deterministically reconciled current state, then independently scores the resulting answer. A valid answer needs to cite transactions that still exist and disclose limitations such as an incomplete period, a pending-to-posted replacement, a refund, or a removed record.
+![Relay connection recovery console showing an Item that needs an update Link session](docs/relay-recovery.png)
 
-The project uses synthetic fixtures for expected behavior. The Sandbox integration is separate and shows the real account and cursor-based sync path without claiming that Sandbox transactions have fraud or correctness labels.
+## What it demonstrates
 
-![Replay case showing a rejected unsupported answer beside an accepted evidence-backed answer](docs/replay-proof.png)
+The central flow is based on Plaid's update-mode guidance:
 
-## What it tests
-
-The suite covers twelve cases that are easy to mishandle when an agent works from transaction history:
-
-- a partial-period comparison
-- a pending card charge that becomes posted
-- merchant enrichment applied through a modified transaction
-- a refund that offsets a purchase
-- two identical utility payments that need confirmation
-- a transaction removed by a later sync response
-- a settlement amount changed through `modified`
-- similar charges across two accounts
-- transfer exclusion from a spending total
-- incomplete account coverage
-- recurring-looking charges and a normal posted-purchase control
-
-Each case starts from an empty local state. The harness applies `added`, `modified`, and `removed` changes in cursor order, then exposes only the final transaction state to the answer validator.
-
-## The answer contract
-
-The validator does not decide whether an answer sounds good. It checks facts that can be tested:
-
-- cited transaction IDs exist in the current replay state
-- required source transactions are included
-- stale pending or removed records are not cited
-- the answer contains the limitations required by that fixture
-- a conclusion is present
-
-This keeps the evaluation separate from a model score. An agent can use the MCP tools to inspect a case and submit its own structured answer for validation.
-
-## OpenAI benchmark
-
-The optional benchmark runs the same cases twice: first from raw `added` / `modified` / `removed` batches, then from a deterministic current-state reconciliation. It does not use the reference answer or validation contract as model context. Both outputs are scored afterward by the same independent validator.
-
-Run one case before paying for the full suite:
-
-```powershell
-npm run benchmark:openai -- --model <your-model-id> --case R02
+```text
+healthy Item
+  → ITEM_LOGIN_REQUIRED / PENDING_DISCONNECT / PENDING_EXPIRATION
+  → recovery required
+  → one update-mode Link session
+  → completed repair or newer LOGIN_REPAIRED
+  → healthy Item
 ```
 
-Run all twelve cases:
+The console makes the application-side decisions explicit:
 
-```powershell
-npm run benchmark:openai -- --model <your-model-id> --all
-```
+- Persist every recovery-relevant event with an idempotency key.
+- Reject a duplicate event before it creates another user prompt.
+- Prevent more than one active recovery session per Item.
+- Ignore an old `LOGIN_REPAIRED` event when a newer issue is still open.
+- Supersede an in-progress recovery session if Plaid reports that the login was repaired elsewhere.
+- Keep access tokens and Plaid secrets on the server. The browser only receives a short-lived `link_token` for a real Sandbox Link session.
 
-Set a newly issued `OPENAI_API_KEY` in your terminal or `.env`. Raw response reports are written locally to `output/benchmarks/` and are intentionally not committed. A concise result summary belongs in the README only after a real run. See [the benchmark protocol](docs/benchmark-protocol.md).
+## Why Link update mode
 
-### First exploratory run
+Plaid directs integrations to use update mode for `ITEM_LOGIN_REQUIRED`, `PENDING_EXPIRATION`, and `PENDING_DISCONNECT`; it also sends `LOGIN_REPAIRED` when an Item has healed through another app. Relay is an implementation exercise around those lifecycle signals, rather than a claim that Plaid lacks recovery tooling. See Plaid's [update-mode documentation](https://plaid.com/docs/link/update-mode/).
 
-I ran `gpt-6.1-sol` on all 12 cases in both conditions (24 answers total). After correcting wording-only false negatives in the validator and rescoring the saved responses, raw Sync passed 11/12 contracts and reconciled state passed 10/12. That is a single synthetic run, not a general model-performance claim and not evidence that reconciliation improves a model by itself.
+## How the demo works
 
-The meaningful failure was R06: in both conditions, the model explained that a transaction had been removed but still cited its obsolete ID as evidence. One reconciled R03 answer also omitted the `merchant_enriched` limitation. Those are the kinds of state and provenance errors the harness is designed to expose. [Run notes and limits](docs/first-openai-run.md)
+The app always starts with an offline fixture:
 
-## MCP interface
+- **First Platypus Checking** is healthy.
+- **First Platypus Credit** has a simulated `PENDING_DISCONNECT` event and needs action.
 
-The local Streamable HTTP endpoint is `http://127.0.0.1:8787/mcp`.
+You can run the complete fixture path locally: issue a recovery session, observe the duplicate-session guard, and complete the simulated repair. The event timeline and state count update immediately.
 
-| Tool | Purpose |
-| --- | --- |
-| `list_replay_cases` | Lists the twelve synthetic replay cases. |
-| `get_replay_case` | Returns one case's cursor steps, current transactions, coverage, and answer contract. |
-| `validate_financial_answer` | Checks a proposed structured answer against the current replay state. |
-
-All three tools are read-only. They operate on synthetic fixtures and do not access a user's financial data, contact a bank, or submit a dispute.
-
-## Verified connector run
-
-The local MCP server was connected to ChatGPT through an OpenAI Secure MCP Tunnel and exercised against `R02`, the pending-to-posted case. ChatGPT cited `coffee-posted`, excluded the removed pending record, supplied the required `pending_replaced` limitation, and received a five-check pass from the validator. [Verification notes](docs/chatgpt-mcp-verification.md)
+If `PLAID_CLIENT_ID` and `PLAID_SECRET` are configured, Relay also exposes a separate **Launch Sandbox Link** path. It creates a real Sandbox Item server-side and uses `/link/token/create` with the existing Item access token to initialize Link update mode. No access token is sent to the browser. Plaid documents `/sandbox/item/reset_login` specifically for testing this flow. [Plaid testing guidance](https://plaid.com/docs/link/update-mode/#testing-update-mode)
 
 ## Architecture
 
 ```text
-Plaid Sandbox
-  -> Transactions Sync cursor
-  -> normalized SQLite records
-
-Synthetic sync fixture
-  -> added / modified / removed replay
-  -> current transaction state
-  -> answer-contract validator
-  -> browser UI or MCP client
+Fixture event or app-side Plaid signal
+  → Relay state reducer
+  → SQLite Item / event / recovery-session snapshot
+  → recovery console UI
+  → optional Sandbox Link update session
 ```
 
-- `src/replay-suite.js` contains the fixtures, cursor reducer, and answer validator.
-- `src/replay-mcp.js` exposes the replay harness through MCP.
-- `server.mjs` serves the browser UI and Plaid Sandbox sync route.
-- `src/replay-db.js` stores normalized Sandbox transactions in SQLite.
-- `tests/replay-suite.test.mjs` tests sync semantics and unsupported citations.
-- `tests/replay-mcp.test.mjs` tests the live Streamable HTTP transport.
+- `src/relay-core.js` is the pure lifecycle reducer and session guard.
+- `src/relay-db.js` persists Item, event, and recovery-session state in SQLite.
+- `server.mjs` exposes the local recovery API and keeps Plaid credentials server-side.
+- `app.js` renders the recovery timeline and fixture/Sandbox paths.
+- `docs/relay-spec.md` records the scope and definition of done.
+- `docs/relay-test-plan.md` records the lifecycle and UI acceptance cases.
 
 ## Run locally
 
@@ -110,18 +69,11 @@ npm start
 
 Open `http://127.0.0.1:4173`.
 
-To run the MCP server separately:
-
-```powershell
-npm run mcp
-```
-
-The app works in fixture mode without credentials. Add Plaid Sandbox credentials to `.env` to enable the live Sandbox account and sync route:
+The fixture demo works without any credentials. To enable the Sandbox Link path, add these values to the ignored `.env` file:
 
 ```dotenv
 PLAID_CLIENT_ID=...
 PLAID_SECRET=...
-PLAID_ENV=sandbox
 ```
 
 ## Test
@@ -130,8 +82,8 @@ PLAID_ENV=sandbox
 npm test
 ```
 
-The test suite covers pending replacement, modified merchant enrichment, stale-citation rejection, partial-period disclosure, all reference contracts, and the running MCP endpoint.
+The test suite covers login-required and pending-expiration transitions, idempotent event handling, stale self-healing events, single-session enforcement, completion, superseding sessions, and token redaction.
 
-## Scope
+## Scope and security boundary
 
-This is an engineering prototype for replaying synthetic transaction changes. It is not a fraud model, a production financial advisor, or a measure of how ChatGPT performs with a user's connected account. It is a way to make the data assumptions behind an agent answer testable.
+Relay is a local Sandbox prototype. Its `POST /api/relay/events` route accepts normalized fixture events for demonstration and is not a production Plaid webhook receiver. Production webhook verification, notification delivery, and production financial data are intentionally out of scope. The UI labels fixture actions separately from the Sandbox-backed Link path.
