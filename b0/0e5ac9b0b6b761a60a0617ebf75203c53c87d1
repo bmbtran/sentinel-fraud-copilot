@@ -1,0 +1,42 @@
+docs/chatgpt-mcp-verification.md
+  s_0b84c363e40fea::t_6870bfd3a7c6c2 1-14
+README.md
+  s_0b84c363e40fea::t_6870bfd3a7c6c2 50-53
+  s_0b84c363e40fea::t_b6597d9e306292 11-12
+src/replay-suite.js
+  s_0b84c363e40fea::t_e5a5389b17b5e4 30,142-143,149,155-178,184
+tests/replay-suite.test.mjs
+  s_0b84c363e40fea::t_5326674db7c7a5 4,47-64
+  s_0b84c363e40fea::t_67b6d88c2df678 65
+styles.css
+  s_0b84c363e40fea::t_444a6a8e3af232 216-255,872-873
+  s_0b84c363e40fea::t_566c40b06610a5 874
+app.js
+  s_0b84c363e40fea::t_f0043afd88d032 28-30
+  s_0b84c363e40fea::t_cab741ba2a5d29 36-39
+.gitignore
+  s_0b84c363e40fea::t_b6597d9e306292 7-8
+server.mjs
+  s_0b84c363e40fea::t_3eeb23b5024985 7-12,101-111,139-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b00e5ac9b0b6b761a60a0617ebf75203c53c87d1",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
