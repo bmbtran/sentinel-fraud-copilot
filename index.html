@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Sentinel is a Plaid Transactions Sync prototype for reviewing unusual charges with deterministic checks and Claude."
+      content="A replay harness for testing AI agents against Plaid Transactions Sync changes."
     />
-    <title>Sentinel — Plaid transaction review</title>
+    <title>Plaid Agent Replay Lab</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,37 +16,35 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="incident.css" />
-    <link rel="stylesheet" href="badge.css" />
   </head>
   <body>
     <div class="shell">
       <header>
         <a class="brand" href="#overview"
-          ><span class="brand-mark">S</span>Sentinel</a
-        ><span class="env">PLAID TRANSACTIONS</span
+          ><span class="brand-mark">P</span>Replay Lab</a
+        ><span class="env">PLAID TRANSACTIONS SYNC</span
         ><span class="header-copy"
-          >Sandbox item · Transactions Sync · SQLite</span
+          >Sandbox item · cursor replay · SQLite</span
         ><span id="connection" class="connection">Checking Plaid…</span>
       </header>
       <aside>
-        <p class="nav-label">SENTINEL</p>
+        <p class="nav-label">AGENT RELIABILITY</p>
         <nav>
           <button class="active" data-view="overview">Overview</button
-          ><button data-view="alerts">Charges to review</button
-          ><button data-view="trust">Compare decisions</button
-          ><button data-view="method">What it sees</button>
+          ><button data-view="cases">Replay cases</button
+          ><button data-view="trace">Cursor trace</button
+          ><button data-view="method">Data path</button>
         </nav>
         <div class="sidebar-note">
-          <b>For the person reviewing a charge</b
+          <b>For teams building financial agents</b
           ><span
-            >Sentinel explains a flag. It never contacts a bank or moves
-            money.</span
+            >Test whether an answer is supported by the current transaction
+            state before it reaches a user.</span
           >
         </div>
       </aside>
       <main id="app" aria-live="polite">
-        <div class="loading">Loading Sentinel…</div>
+        <div class="loading">Loading replay cases…</div>
       </main>
     </div>
     <script type="module" src="app.js"></script>

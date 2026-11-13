@@ -1,259 +1,67 @@
-import { renderIncidentSummary } from "./incident-ui.js";
-
 const app = document.querySelector("#app");
-const state = {
-  view: "overview",
-  data: null,
-  benchmark: null,
-  selectedId: "S01",
-  detail: null,
-  status: "",
-  liveClaude: null,
-  aiLoading: false,
-  plaidSyncing: false,
-  incident: null,
-};
-const money = (value) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-const escapeHtml = (value) =>
-  String(value ?? "").replace(
-    /[&<>"']/g,
-    (char) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        char
-      ],
-  );
-const label = (value) =>
-  String(value)
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-const pill = (text, tone = text) =>
-  `<span class="pill ${String(tone).toLowerCase()}">${escapeHtml(label(text))}</span>`;
-async function get(url) {
-  const response = await fetch(url);
+const state = { view: "overview", harness: null, selectedId: "R01", detail: null, plaid: null, syncing: false };
+
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+const label = (value) => String(value ?? "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const transaction = (item) => `<tr><td><code>${escapeHtml(item.transaction_id)}</code></td><td>${escapeHtml(item.merchant_name ?? item.original_description ?? "Unenriched merchant")}</td><td>${escapeHtml(item.date)}</td><td>${item.amount < 0 ? "−" : ""}$${Math.abs(item.amount).toFixed(2)}</td><td>${item.pending ? "Pending" : "Posted"}</td></tr>`;
+
+async function get(path) {
+  const response = await fetch(path);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Request failed.");
   return data;
 }
-async function selectScenario(id, shouldRender = true) {
+
+async function selectCase(id, render = true) {
   state.selectedId = id;
-  state.liveClaude = null;
-  state.incident = null;
-  state.detail = await get(`/api/scenarios/${id}`);
-  if (shouldRender) render();
+  state.detail = await get(`/api/replay/${id}`);
+  if (render) draw();
 }
-async function load() {
-  [state.data, state.benchmark] = await Promise.all([
-    get("/api/dashboard"),
-    get("/api/benchmark"),
-  ]);
-  await selectScenario(state.selectedId, false);
-  render();
-}
-function riskRing(score) {
-  const dash = Math.round(score * 1.89);
-  return `<div class="risk-ring" style="--dash:${dash}"><svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30"></circle><circle class="progress" cx="36" cy="36" r="30"></circle></svg><b>${score}</b><small>risk</small></div>`;
-}
+
 function header(title, copy, action = "") {
-  return `<header class="page-head"><div><h1>${title}</h1><p>${copy}</p></div>${action}</header>`;
+  return `<div class="page-head"><div><p class="eyebrow">PLAID AGENT REPLAY LAB</p><h1>${title}</h1><p>${copy}</p></div>${action}</div>`;
 }
+
 function renderOverview() {
-  const { summary, personas, resolutions } = state.data;
+  const { summary, runs } = state.harness;
   const detail = state.detail;
-  const person = personas.find((item) => item.id === detail.scenario.personaId);
-  return `<div class="page">${header("Account overview", "Transaction history, active review, and deterministic evidence for the selected account.", `<button class="outline" data-view="trust">View evaluation</button>`)}<section class="metrics"><article><span>Recent charges</span><b>${summary.monitored}</b><small>Available in this demo account</small></article><article><span>Review now</span><b class="danger-text">${summary.alerts}</b><small>Several details do not line up</small></article><article><span>Needs confirmation</span><b class="amber-text">${summary.review}</b><small>Review before taking action</small></article><article><span>Saved decisions</span><b>${resolutions.length}</b><small>Recorded for this account</small></article></section><section class="hero-card"><div><h2>Spending reference: <em>${person.name}</em></h2><p>${detail.profile.transactionCount} prior transactions establish regular merchants, known locations, and usual activity hours.</p><div class="person-row"><span class="avatar">${person.avatar}</span><div><b>${person.name}</b><small>${person.role} · ${person.city}</small></div><button class="text-button" data-view="alerts">Choose another account</button></div></div>${riskRing(detail.hybrid.score)}</section><section class="section-grid"><article class="card focus-alert"><div class="card-head"><div><p class="eyebrow">CURRENTLY UNDER REVIEW</p><h2>${detail.scenario.title}</h2></div>${pill(detail.hybrid.action, detail.hybrid.action === "alert" ? "fraud" : "investigate")}</div><div class="transaction"><div class="merchant-icon">↗</div><div><b>${detail.scenario.target.merchant}</b><small>${detail.scenario.target.location} · ${new Date(detail.scenario.target.date).toLocaleString([], { hour: "numeric", minute: "2-digit" })}</small></div><strong>${money(detail.scenario.target.amount)}</strong></div><div class="evidence-line">${detail.hybrid.evidence.map((item) => `<span>${label(item.code)}</span>`).join("")}</div><button class="primary full" data-view="alerts">Review charge</button></article><article class="card"><h2>Reference points</h2><div class="fingerprint"><span>Typical purchase <b>${money(detail.profile.typicalAmount)}</b></span><span>Known locations <b>${detail.profile.regions.length}</b></span><span>Most common merchant <b>${escapeHtml(detail.profile.merchants[0]?.merchant ?? "—")}</b></span></div><p class="fine-print">A pattern is a reference point, not proof that a charge is wrong.</p></article></section></div>`;
+  return `<div class="page">${header("Test the data before you test the answer", "A replay harness for financial agents that receive Plaid transaction data. It checks whether an answer still has valid sources and appropriate limitations after the sync stream changes.", '<button class="primary" data-view="cases">Open replay cases</button>')}<section class="metrics"><article><span>Replay cases</span><b>${summary.total}</b><small>Synthetic Plaid-shaped fixtures</small></article><article><span>Reference contracts</span><b>${summary.passed}/${summary.total}</b><small>Deterministic validation passes</small></article><article><span>Sync operations</span><b>${summary.syncOperations.length}</b><small>Added, modified, removed</small></article><article><span>Current case</span><b>${escapeHtml(detail.id)}</b><small>${escapeHtml(detail.title)}</small></article></section><section class="section-grid"><article class="card focus-alert"><p class="eyebrow">CURRENT REPLAY</p><h2>${escapeHtml(detail.question)}</h2><p>${escapeHtml(detail.purpose)}</p><div class="evidence-line">${detail.assertions.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div><button class="outline" data-view="trace">Inspect cursor trace</button></article><article class="card"><p class="eyebrow">WHAT THE HARNESS CHECKS</p><h2>Financial claims need more than a plausible answer.</h2><ul class="counterfactuals"><li>Only current transaction IDs may be cited.</li><li>Coverage gaps and data changes must be disclosed.</li><li>Refunds, pending replacements, and removals affect what can be claimed.</li></ul></article></section><section class="card benchmark"><div class="card-head"><div><h2>Reference-contract run</h2><p class="fine-print">These are fixture contracts, not model scores.</p></div></div><div class="table-wrap"><table><thead><tr><th>Case</th><th>Result</th><th>Required coverage behavior</th></tr></thead><tbody>${runs.map((run) => `<tr><td><b>${run.id}</b> ${escapeHtml(run.title)}</td><td><span class="pill legitimate">${run.passed ? "Pass" : "Fail"}</span></td><td>${escapeHtml(run.checks.find((check) => check.id === "limitations").detail)}</td></tr>`).join("")}</tbody></table></div></section></div>`;
 }
-function transactionDetail() {
-  const { scenario, profile, rules, claude, hybrid } = state.detail;
-  const live = state.liveClaude
-    ? `<article class="live-claude"><p class="eyebrow">CLAUDE’S SECOND READ · ${escapeHtml(state.liveClaude.model)}</p><b>${pill(state.liveClaude.classification, state.liveClaude.classification)} ${Math.round(state.liveClaude.confidence * 100)}% confidence</b><p>${escapeHtml(state.liveClaude.rationale)}</p></article>`
-    : "";
-  return `<section class="alert-layout"><article class="card alert-main"><div class="alert-top"><div><div class="risk-label">${pill(hybrid.action, hybrid.action === "alert" ? "fraud" : "investigate")} <span>${hybrid.confidence}% confidence</span></div><h2>${escapeHtml(scenario.target.merchant)}</h2><p>${money(scenario.target.amount)} · ${scenario.target.location} · ${new Date(scenario.target.date).toLocaleString()}</p></div>${riskRing(hybrid.score)}</div><div class="decision-copy"><h3>Here’s what doesn’t line up</h3><p>${escapeHtml(claude.rationale)}</p></div><div class="evidence-list">${hybrid.evidence.map((item) => `<article><div class="signal-dot ${item.severity}"></div><div><b>${label(item.code)}</b><p>${escapeHtml(item.detail)}</p></div><strong>+${item.points}</strong></article>`).join("") || `<p class="empty">Nothing high-risk turned up for this charge.</p>`}</div><div class="actions"><button class="danger" data-resolve="fraud">I don’t recognize this</button><button class="outline" data-resolve="legitimate">I made this purchase</button></div><p class="safe-copy">This only records your choice in Sentinel. For a real disputed charge, contact your card issuer directly.</p></article><aside class="side-stack"><article class="card"><p class="eyebrow">WHAT WOULD MAKE THIS LESS CONCERNING?</p><h3>Details that would change the call</h3><ul class="counterfactuals">${hybrid.counterfactuals.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>No material counterfactual applies.</li>"}</ul></article><article class="card"><p class="eyebrow">ASK CLAUDE</p><h3>Get a separate read on the same facts</h3><button class="outline ai-button" data-live-claude ${state.aiLoading ? "disabled" : ""}>${state.aiLoading ? "Checking…" : "Ask Claude to review it"}</button>${live}<p class="fine-print">This is an optional live call. The comparison page stays repeatable.</p></article><article class="card"><p class="eyebrow">HOW THIS CALL WAS MADE</p><div class="trace"><span><i>1</i> Specific account signals <b>${rules.score}/100</b></span><span><i>2</i> Claude’s read <b>${claude.classification}</b></span><span><i>3</i> What Sentinel shows <b>${hybrid.action}</b></span></div><p class="fine-print">${profile.confidence} confidence from ${profile.transactionCount} earlier transactions</p></article></aside></section>`;
+
+function renderCases() {
+  const rows = state.harness.cases.map((item) => `<button class="scenario-row ${item.id === state.selectedId ? "selected" : ""}" data-case="${item.id}"><span class="row-risk">${item.id}</span><span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.purpose)}</small></span><span class="pill investigate">${item.stepCount} ${item.stepCount === 1 ? "step" : "steps"}</span></button>`).join("");
+  const detail = state.detail;
+  return `<div class="page">${header("Replay cases", "Each case starts from an empty local state and applies Plaid-shaped sync changes in cursor order.")}<div class="alerts-layout"><section class="card scenario-list"><div class="card-head"><h2>${state.harness.cases.length} cases</h2></div>${rows}</section><section class="card alert-main"><p class="eyebrow">${escapeHtml(detail.id)} · ANSWER CONTRACT</p><h2>${escapeHtml(detail.title)}</h2><p>${escapeHtml(detail.question)}</p><div class="decision-copy"><h3>Why this exists</h3><p>${escapeHtml(detail.purpose)}</p></div><div class="evidence-list">${detail.assertions.map((item) => `<article><div class="signal-dot medium"></div><div><b>Required behavior</b><p>${escapeHtml(item)}</p></div></article>`).join("")}</div><p class="safe-copy">Reference conclusion: ${escapeHtml(detail.contract.referenceConclusion)}</p><button class="primary" data-view="trace">View the replay trace</button></section></div></div>`;
 }
-function renderAlerts() {
-  const rows = state.data.scenarios
-    .slice()
-    .sort((a, b) => b.risk - a.risk)
-    .map(
-      (item) =>
-        `<button class="scenario-row ${item.id === state.selectedId ? "selected" : ""}" data-scenario="${item.id}"><span class="row-risk">${item.risk}</span><span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.target.merchant)} · ${money(item.target.amount)}</small></span>${pill(item.action, item.action === "alert" ? "fraud" : "investigate")}</button>`,
-    )
-    .join("");
-  return `<div class="page">${header("Review queue", "Select a charge to inspect its account context, model assessment, and rule evidence.")}<div class="alerts-layout"><section class="card scenario-list"><div class="card-head"><div><h2>${state.data.scenarios.length} review cases</h2></div></div>${rows}</section>${transactionDetail()}</div>${state.status ? `<div class="toast">${escapeHtml(state.status)}</div>` : ""}</div>`;
+
+function renderTrace() {
+  const detail = state.detail;
+  const timeline = detail.steps.map((step) => `<article class="card"><p class="eyebrow">CURSOR ${escapeHtml(step.cursor)}</p><div class="trace"><span><i>+</i> Added <b>${step.added.join(", ") || "—"}</b></span><span><i>~</i> Modified <b>${step.modified.join(", ") || "—"}</b></span><span><i>−</i> Removed <b>${step.removed.join(", ") || "—"}</b></span></div><p class="fine-print">Current state: ${step.currentTransactionIds.join(", ") || "no transactions"}</p></article>`).join("");
+  return `<div class="page">${header("Cursor trace", "This is the state an agent should reason over after each Transactions Sync response.", '<button class="outline" data-view="cases">Choose another case</button>')}<section class="method-grid">${timeline}</section><section class="card benchmark"><div class="card-head"><div><p class="eyebrow">FINAL REPLAY STATE</p><h2>Transactions available to cite</h2></div><span class="dataset">${detail.transactions.length} current records</span></div><div class="table-wrap"><table><thead><tr><th>Transaction ID</th><th>Merchant</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${detail.transactions.map(transaction).join("") || '<tr><td colspan="5">No current transactions remain.</td></tr>'}</tbody></table></div><p class="fine-print">Coverage: ${escapeHtml(detail.coverage.start)} through ${escapeHtml(detail.coverage.end)}. Incomplete periods: ${detail.coverage.incompletePeriods.join(", ") || "none"}.</p></section></div>`;
 }
-function renderTrust() {
-  const engineCards = state.benchmark.engines
-    .map((engine) => {
-      const name =
-        engine.engine === "rules"
-          ? "Deterministic rules"
-          : engine.engine === "claude"
-            ? "Recorded Claude"
-            : "Hybrid policy";
-      const label =
-        engine.engine === "rules"
-          ? "RULES"
-          : engine.engine === "claude"
-            ? "RECORDED MODEL RUN"
-            : "RULES + RECORDED MODEL";
-      return `<article class="engine ${engine.engine}"><p>${label}</p><h2>${name}</h2><div class="engine-score"><b>${engine.f1}<small>macro F1</small></b><span><strong>${engine.precision}%</strong> macro precision<br><strong>${engine.recall}%</strong> macro recall</span></div></article>`;
-    })
-    .join("");
-  const rows = state.benchmark.cases
-    .map(
-      (item) =>
-        `<tr><td><b>${item.id}</b> ${escapeHtml(item.title)}</td><td>${pill(item.expected, item.expected)}</td><td>${pill(item.rules, item.rules)}</td><td>${pill(item.claude, item.claude)}</td><td>${pill(item.hybrid, item.hybrid)}</td></tr>`,
-    )
-    .join("");
-  const dataset = state.benchmark.dataset;
-  const recordedAt = new Date(dataset.recordedAt).toLocaleDateString();
-  return `<div class="page">${header("Evaluation results", "Each approach sees the same eight synthetic cases. The live model is not used to calculate these scores.")}<section class="engine-grid">${engineCards}</section><section class="card benchmark"><div class="card-head"><div><h2>Case-level results</h2></div><span class="dataset">${dataset.total} fixed cases</span></div><div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Expected</th><th>Rules</th><th>Recorded Claude</th><th>Hybrid</th></tr></thead><tbody>${rows}</tbody></table></div><p class="fine-print">${escapeHtml(dataset.note)} Recorded ${escapeHtml(dataset.model)} on ${recordedAt}, temperature 0, prompt ${escapeHtml(dataset.promptVersion)}.</p></section></div>`;
-}
+
 function renderMethod() {
-  return `<div class="page methodology">${header("Plaid data path", "Plaid supplies the account and transaction record. Sentinel keeps the review policy separate and inspectable.")}<section class="method-grid"><article class="card"><h2>Transactions Sync</h2><p>The server creates a Sandbox item and calls <code>/transactions/sync</code>. Added and modified records are normalized with the cursor-based Sync API.</p><button class="outline ai-button" data-sync-plaid ${state.plaidSyncing ? "disabled" : ""}>${state.plaidSyncing ? "Syncing Plaid data…" : "Sync Plaid Sandbox data"}</button></article><article class="card"><h2>SQLite review store</h2><p>Normalized Plaid records, review decisions, incident summaries, and audit events are stored in <code>data/sentinel.sqlite</code>.</p></article><article class="card"><h2>Decision policy</h2><p>Deterministic checks preserve high-signal patterns such as card testing. Claude provides a separate assessment, not an authorization decision.</p></article><article class="card"><h2>Evaluation fixtures</h2><p>The comparison screen uses synthetic cases so results can be replayed. Plaid supplies transaction data, not fraud labels.</p></article></section><section class="flow card"><div><span>Plaid Sandbox item</span><i></i><span>Transactions Sync</span><i></i><span>Normalize and persist</span><i></i><span>Build a spending reference</span></div></section></div>`;
+  const status = state.plaid?.connected ? `Sandbox connected to ${state.plaid.accounts.length} account(s).` : "Demo fixtures are available without credentials.";
+  return `<div class="page">${header("Data path", "The harness uses the same data-change semantics an agent sees after Plaid Transactions Sync.")}<section class="method-grid"><article class="card"><h2>Transactions Sync replay</h2><p>Every fixture applies added, modified, and removed records in cursor order. A modified record updates state; it is not a second transaction.</p></article><article class="card"><h2>Answer contract</h2><p>An agent must cite current transaction IDs and disclose fixture-specific limitations before its answer passes validation.</p></article><article class="card"><h2>SQLite + Sandbox</h2><p>Sandbox sync records are normalized and stored locally. The replay suite stays synthetic so expected behavior is repeatable.</p><button class="outline ai-button" data-sync ${state.syncing ? "disabled" : ""}>${state.syncing ? "Syncing…" : "Sync Plaid Sandbox data"}</button><p class="fine-print">${escapeHtml(status)}</p></article><article class="card"><h2>MCP interface</h2><p>ChatGPT or another client can list cases, inspect a replay state, and validate a proposed structured answer through three read-only tools.</p></article></section></div>`;
 }
-function render() {
-  if (!state.data || !state.detail) return;
-  document
-    .querySelectorAll("nav button")
-    .forEach((button) =>
-      button.classList.toggle("active", button.dataset.view === state.view),
-    );
-  app.innerHTML =
-    state.view === "overview"
-      ? renderOverview()
-      : state.view === "alerts"
-        ? renderAlerts()
-        : state.view === "trust"
-          ? renderTrust()
-          : renderMethod();
-  if (state.status && state.view !== "alerts") {
-    app.insertAdjacentHTML(
-      "beforeend",
-      `<div class="toast">${escapeHtml(state.status)}</div>`,
-    );
-  }
-  if (state.view === "alerts" && state.incident)
-    document
-      .querySelector(".alerts-layout")
-      ?.insertAdjacentHTML("afterend", renderIncidentSummary(state.incident));
+
+function draw() {
+  app.innerHTML = state.view === "cases" ? renderCases() : state.view === "trace" ? renderTrace() : state.view === "method" ? renderMethod() : renderOverview();
+  document.querySelectorAll("[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === state.view));
+  const connection = document.querySelector("#connection");
+  if (connection) connection.textContent = state.plaid?.connected ? "Plaid Sandbox ready" : "Fixture mode";
 }
-document.querySelector("nav").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-view]");
-  if (button) {
-    state.view = button.dataset.view;
-    render();
-  }
-});
-app.addEventListener("click", async (event) => {
+
+document.addEventListener("click", async (event) => {
   const view = event.target.closest("[data-view]");
-  if (view) {
-    state.view = view.dataset.view;
-    render();
-    return;
-  }
-  const scenario = event.target.closest("[data-scenario]");
-  if (scenario) {
-    await selectScenario(scenario.dataset.scenario);
-    return;
-  }
-  const liveButton = event.target.closest("[data-live-claude]");
-  if (liveButton && !state.aiLoading) {
-    state.aiLoading = true;
-    render();
-    try {
-      const response = await fetch(
-        `/api/scenarios/${state.selectedId}/claude`,
-        { method: "POST" },
-      );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error ?? "Claude analysis failed.");
-      state.liveClaude = data.assessment;
-    } catch (error) {
-      state.status =
-        error instanceof Error ? error.message : "Claude analysis failed.";
-    } finally {
-      state.aiLoading = false;
-      render();
-    }
-    return;
-  }
-  const syncButton = event.target.closest("[data-sync-plaid]");
-  if (syncButton && !state.plaidSyncing) {
-    state.plaidSyncing = true;
-    render();
-    try {
-      const response = await fetch("/api/plaid/sync", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Plaid sync failed.");
-      state.status = `Plaid sync stored ${data.received} transaction updates (${data.stored} total).`;
-      await plaidStatus();
-    } catch (error) {
-      state.status =
-        error instanceof Error ? error.message : "Plaid sync failed.";
-    } finally {
-      state.plaidSyncing = false;
-      render();
-    }
-    return;
+  if (view) { state.view = view.dataset.view; draw(); return; }
+  const replay = event.target.closest("[data-case]");
+  if (replay) { await selectCase(replay.dataset.case); return; }
+  if (event.target.closest("[data-sync]") && !state.syncing) {
+    state.syncing = true; draw();
+    try { await fetch("/api/plaid/sync", { method: "POST" }); state.plaid = await get("/api/plaid/status"); }
+    finally { state.syncing = false; draw(); }
   }
 });
-async function plaidStatus() {
-  try {
-    const data = await get("/api/plaid/status");
-    document.querySelector("#connection").textContent = data.connected
-      ? `Plaid Sandbox · ${data.accounts.length} accounts ready`
-      : "Demo Mode · Plaid ready when configured";
-    document
-      .querySelector("#connection")
-      .classList.toggle("connected", data.connected);
-  } catch {
-    document.querySelector("#connection").textContent = "Demo Mode";
-  }
-}
-app.addEventListener(
-  "click",
-  async (event) => {
-    const copy = event.target.closest("[data-copy-incident]");
-    if (copy && state.incident) {
-      await navigator.clipboard.writeText(state.incident.plainText);
-      state.status =
-        "Incident summary copied. It is ready to paste into your notes or a bank support chat.";
-      render();
-      return;
-    }
-    const resolution = event.target.closest("[data-resolve]");
-    if (!resolution) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const response = await fetch(`/api/scenarios/${state.selectedId}/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision: resolution.dataset.resolve }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      state.status = data.error ?? "Could not save your decision.";
-      render();
-      return;
-    }
-    state.incident = data.incident ?? null;
-    state.status = data.incident
-      ? "Incident summary prepared. Review the evidence below before contacting your issuer."
-      : "Marked as a purchase you recognize.";
-    await load();
-    state.incident = data.incident ?? null;
-    render();
-  },
-  true,
-);
-load().catch((error) => {
-  app.innerHTML = `<div class="error"><b>Sentinel could not start.</b><br>${escapeHtml(error.message)}</div>`;
-});
-plaidStatus();
+
+Promise.all([get("/api/harness"), get("/api/plaid/status")]).then(async ([harness, plaid]) => { state.harness = harness; state.plaid = plaid; await selectCase(state.selectedId, false); draw(); }).catch((error) => { app.innerHTML = `<div class="page"><h1>Could not load the replay lab</h1><p>${escapeHtml(error.message)}</p></div>`; });

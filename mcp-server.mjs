@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createSentinelMcpServer } from "./src/sentinel-mcp.js";
+import { createReplayMcpServer } from "./src/replay-mcp.js";
 
 const port = Number(process.env.MCP_PORT ?? 8787);
 
@@ -21,7 +21,7 @@ createServer(async (request, response) => {
   if (url.pathname === "/health") {
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(
-      JSON.stringify({ status: "ok", server: "sentinel-transaction-review" }),
+        JSON.stringify({ status: "ok", server: "plaid-agent-replay-lab" }),
     );
     return;
   }
@@ -38,7 +38,7 @@ createServer(async (request, response) => {
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
-    const server = createSentinelMcpServer();
+    const server = createReplayMcpServer();
     await server.connect(transport);
     await transport.handleRequest(
       request,
@@ -54,5 +54,5 @@ createServer(async (request, response) => {
     );
   }
 }).listen(port, "127.0.0.1", () => {
-  console.log(`Sentinel MCP listening on http://127.0.0.1:${port}/mcp`);
+  console.log(`Plaid Agent Replay Lab MCP listening on http://127.0.0.1:${port}/mcp`);
 });

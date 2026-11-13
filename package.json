@@ -1,6 +1,6 @@
 {
-  "name": "sentinel-fraud-copilot",
-  "version": "0.1.0",
+  "name": "plaid-agent-replay-lab",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,8 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "mcp": "node --env-file-if-exists=.env mcp-server.mjs",
-    "test": "node --test",
-    "record:claude-baseline": "node --env-file-if-exists=.env scripts/record-claude-baseline.mjs"
+    "test": "node --test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
