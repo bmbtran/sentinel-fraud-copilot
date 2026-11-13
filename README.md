@@ -1,10 +1,10 @@
 # Sentinel
 
-### A demo app for reviewing suspicious charges with Plaid data, rules, and Claude.
+### A charge-review prototype built with Plaid transaction data, deterministic checks, and Claude.
 
-Most fraud alerts ask a user to make a snap call with almost no context: *“Was this you?”* Sentinel compares a new transaction with the account’s spending history and shows the details that do not fit.
+Most fraud alerts reduce the review to one question: *“Was this you?”* Sentinel adds the context behind that question. It compares a charge with the account’s history, records the checks that fired, and shows which details differ from the person’s usual activity.
 
-This hackathon project uses Claude to explain the context around a charge. Rule checks handle patterns that should stay predictable, such as duplicate charges and card testing.
+The project uses rules for patterns that should remain predictable, including duplicate charges and card testing. Claude produces a separate, structured assessment of the same charge. The comparison screen makes the difference between rules, model output, and the hybrid policy visible.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
@@ -12,10 +12,10 @@ This hackathon project uses Claude to explain the context around a charge. Rule 
 
 The repository is meant to be readable before it is run.
 
-1. **Overview** shows Maya Chen's reference profile built from 13 earlier transactions. The screen shows her typical spend, known locations, common merchants, and the charge currently under review.
-2. **Charges to review** opens an $847 purchase from a first-time merchant in Austin at 2:13 AM. Sentinel shows the rule findings behind the alert: small card-testing charges, an amount outside Maya's usual range, and no prior history with the merchant.
-3. Selecting **I don't recognize this** writes a resolution to SQLite and prepares an incident summary. The summary groups the main charge, related micro-charges, and the next step a person can take with their issuer.
-4. **Compare decisions** runs the same labeled scenarios through Rules Only, Claude Only, and the hybrid policy. This view makes disagreements visible instead of treating a model score as an answer.
+1. **Overview** establishes a reference profile for Maya Chen from 13 earlier transactions: typical spend, known locations, common merchants, and the charge under review.
+2. **Charges to review** examines an $847 purchase at a first-time merchant in Austin at 2:13 AM. The alert includes the rule findings: small card-testing charges, an amount outside Maya's usual range, and no prior merchant history.
+3. Selecting **I don't recognize this** stores a resolution in SQLite and prepares an incident summary. The summary groups the charge, related micro-charges, and the issuer guidance shown in the app.
+4. **Compare decisions** runs the labeled scenarios through Rules Only, Claude Only, and the hybrid policy. It shows where the approaches agree and where they do not.
 
 ## Request flow
 
@@ -40,11 +40,11 @@ The main implementation is small enough to inspect from GitHub:
 
 ## Design notes
 
-The app separates charges into three outcomes: **alert**, **ask**, and **ignore**. A new merchant or a large purchase alone is not enough to trigger an alert. The decision also considers the account's prior spending, nearby transactions, time of day, location, and category.
+The app assigns charges to **alert**, **ask**, or **ignore**. It considers the account's prior spending, nearby transactions, time of day, location, and category. A new merchant or a high amount alone does not trigger an alert.
 
-Each rule keeps its name, score contribution, and supporting detail. Claude receives a minimized transaction context and returns a structured assessment. The hybrid policy uses both results, then produces counterfactuals that explain what would lower the risk score.
+Each rule keeps its name, score contribution, and supporting detail. Claude receives a reduced transaction context and returns a structured assessment. The hybrid policy combines those results and generates counterfactuals that show what would reduce the risk score.
 
-The comparison page replays the same labeled scenarios through Rules Only, Claude Only, and the hybrid policy. The incident flow reuses the same evidence to prepare a summary when a user says a charge is not theirs.
+The comparison page replays the same labeled scenarios through Rules Only, Claude Only, and the hybrid policy. When a user marks a charge as unrecognized, the incident flow reuses that evidence to prepare a summary.
 
 ## Architecture
 
@@ -65,7 +65,7 @@ Plaid Transactions / Demo Scenarios
 ### Stack
 
 - **Frontend:** vanilla JavaScript, semantic HTML, and responsive CSS.
-- **Server:** Node.js HTTP server, kept small enough to make the evaluation path easy to follow.
+- **Server:** Node.js HTTP server with a small request path that is easy to inspect.
 - **Database:** built-in `node:sqlite`; it stores demo personas, scenarios, audit events, user resolutions, incident summaries, and normalized Plaid transactions.
 - **Plaid:** Sandbox item creation, account lookup, and cursor-based `/transactions/sync` ingestion. Plaid credentials and access tokens stay server-side.
 - **Claude:** optional Anthropic Messages API call for an independent, structured assessment of the selected charge. The live response is validated before display.
@@ -73,13 +73,13 @@ Plaid Transactions / Demo Scenarios
 
 ## Implementation choices
 
-Each rule records its own name, score contribution, and detail. The UI can show the score and the evidence behind it.
+Each rule records its name, score contribution, and supporting detail. The UI uses that data to show both the score and the reason for it.
 
-Claude explains the context around a transaction. It does not decide the final action by itself. The deterministic policy keeps duplicate charges, card testing, and other high-signal patterns visible and testable.
+Claude explains the context around a transaction. Deterministic checks keep duplicate charges, card testing, and other high-signal patterns visible and testable.
 
-The comparison page uses seeded scenarios so the same input can be replayed. The optional live Claude check is separate from that benchmark, since model output can vary between calls.
+The comparison page uses seeded scenarios so each approach sees the same input. The optional live Claude check remains separate from the benchmark because model output can vary between calls.
 
-Sentinel does not freeze cards, file disputes, move money, or claim real-world fraud accuracy. The incident summary gives the user a concise record before they contact their issuer.
+Sentinel does not freeze cards, file disputes, move money, or make claims about real-world fraud accuracy. The incident summary gives the user a record to review before contacting their issuer.
 
 ## Run it locally
 
@@ -104,7 +104,7 @@ ANTHROPIC_API_KEY=...
 CLAUDE_MODEL=claude-haiku-4-5-20251001
 ```
 
-The app is still fully demoable without keys. Plaid turns on the Sandbox connection and sync path. Anthropic turns on **Ask Claude to review it** for a selected charge.
+The demo works without keys. Plaid enables the Sandbox connection and sync path. Anthropic enables **Ask Claude to review it** for a selected charge.
 
 ## Test
 
@@ -114,4 +114,4 @@ npm test
 
 ## A note on evaluation
 
-The Compare Decisions screen uses made-up, labeled scenarios. It exists to make the prototype’s choices legible; its precision, recall, and F1 scores are not a claim about real-world fraud performance.
+The Compare Decisions screen uses synthetic, labeled scenarios. Its precision, recall, and F1 scores describe this small evaluation set only. They are not a claim about real-world fraud performance.
