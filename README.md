@@ -1,10 +1,10 @@
 # Sentinel
 
-Most fraud alerts reduce the review to one question: _“Was this you?”_ Sentinel adds the context behind that question. It compares a charge with the account’s history, records the checks that fired, and shows which details differ from the person’s usual activity.
+I started thinking about this while experimenting with Plaid Connector in ChatGPT and Muse. Connecting an account makes transaction history available, but it leaves an important product question open: what should an app show when someone sees a charge they do not recognize?
 
-Plaid is the data boundary. The server creates a Sandbox item, reads account metadata, ingests transaction changes through the cursor-based Transactions Sync API, normalizes those records, and persists them in SQLite. The review policy sits on top of that transaction shape.
+Sentinel is a prototype for that review step. It is designed around the normalized transaction shape from Plaid’s Transactions Sync flow and compares an unfamiliar charge with prior activity: merchant history, amount, time, location, and nearby transactions. The app keeps the evidence visible so a person can understand why a charge was surfaced before deciding what to do.
 
-The project uses rules for patterns that should remain predictable, including duplicate charges and card testing. Claude produces a separate, structured assessment of the same charge. The comparison screen makes the difference between rules, model output, and the hybrid policy visible.
+The server creates a Plaid Sandbox item, reads account metadata, ingests transaction changes through the cursor-based Transactions Sync API, normalizes those records, and persists them in SQLite. Deterministic checks handle patterns such as duplicate charges and card testing. Claude produces a separate structured assessment, while the comparison screen shows where rules, model output, and the hybrid policy differ.
 
 ![Sentinel charge-review demo](docs/sentinel-demo.png)
 
