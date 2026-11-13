@@ -1,7 +1,5 @@
 # Sentinel
 
-### A transaction-review prototype built around Plaid Transactions Sync, deterministic checks, and Claude.
-
 Most fraud alerts reduce the review to one question: _“Was this you?”_ Sentinel adds the context behind that question. It compares a charge with the account’s history, records the checks that fired, and shows which details differ from the person’s usual activity.
 
 Plaid is the data boundary. The server creates a Sandbox item, reads account metadata, ingests transaction changes through the cursor-based Transactions Sync API, normalizes those records, and persists them in SQLite. The review policy sits on top of that transaction shape.
@@ -90,12 +88,12 @@ Plaid Transactions / Demo Scenarios
 
 ### Stack
 
-- **Frontend:** vanilla JavaScript, semantic HTML, and responsive CSS.
+- **Frontend:** JavaScript, HTML, CSS.
 - **Server:** Node.js HTTP server with a small request path that is easy to inspect.
-- **Database:** built-in `node:sqlite`; it stores demo personas, scenarios, audit events, user resolutions, incident summaries, and normalized Plaid transactions.
+- **Database:** SQLite. it stores demo personas, scenarios, audit events, user resolutions, incident summaries, and normalized Plaid transactions.
 - **Plaid:** Sandbox item creation, account lookup, and cursor-based `/transactions/sync` ingestion. Plaid credentials and access tokens stay server-side.
 - **Claude:** an optional Anthropic Messages API call for a structured assessment of the selected charge. The live response uses tool validation before display.
-- **Evaluation:** eight synthetic, labeled scenarios. The comparison screen uses a committed Claude run so the result is repeatable.
+- **Evaluation:** 8 synthetic, labeled scenarios. The comparison screen uses a committed Claude run so the result is repeatable.
 
 ## Implementation choices
 
