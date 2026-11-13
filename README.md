@@ -8,6 +8,8 @@ Plaid Agent Replay Lab replays Plaid-shaped Transactions Sync responses and chec
 
 The project uses synthetic fixtures for expected behavior. The Sandbox integration is separate and shows the real account and cursor-based sync path without claiming that Sandbox transactions have fraud or correctness labels.
 
+![Replay case showing a rejected unsupported answer beside an accepted evidence-backed answer](docs/replay-proof.png)
+
 ## What it tests
 
 The suite covers six cases that are easy to mishandle when an agent works from transaction history:
@@ -44,6 +46,10 @@ The local Streamable HTTP endpoint is `http://127.0.0.1:8787/mcp`.
 | `validate_financial_answer` | Checks a proposed structured answer against the current replay state. |
 
 All three tools are read-only. They operate on synthetic fixtures and do not access a user's financial data, contact a bank, or submit a dispute.
+
+## Verified connector run
+
+The local MCP server was connected to ChatGPT through an OpenAI Secure MCP Tunnel and exercised against `R02`, the pending-to-posted case. ChatGPT cited `coffee-posted`, excluded the removed pending record, supplied the required `pending_replaced` limitation, and received a five-check pass from the validator. [Verification notes](docs/chatgpt-mcp-verification.md)
 
 ## Architecture
 

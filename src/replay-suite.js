@@ -27,7 +27,7 @@ const cases = [
     batches: [
       { cursor: "c1", added: [transaction("oct-dining", 82.4, "2026-10-05", "Restaurant", "credit"), transaction("nov-dining", 61.2, "2026-11-05", "Restaurant", "credit")], modified: [], removed: [] },
     ],
-    contract: { requiredSources: ["oct-dining", "nov-dining"], requiredLimitations: ["partial_period"], prohibitedConclusions: ["monthly trend"], referenceConclusion: "November has lower recorded spending so far, but the period is incomplete." },
+    contract: { requiredSources: ["oct-dining", "nov-dining"], requiredLimitations: ["partial_period"], prohibitedConclusionPhrases: ["monthly spending decreased", "spending went down"], referenceConclusion: "November has lower recorded spending so far, but the period is incomplete." },
   },
   {
     id: "R02",
@@ -139,28 +139,49 @@ export function validateFinancialAnswer({ caseId, conclusion, sourceTransactionI
   const required = replay.contract.requiredSources;
   const forbidden = replay.contract.forbiddenSources ?? [];
   const statedLimitations = new Set(limitations ?? []);
+  const prohibited = replay.contract.prohibitedConclusionPhrases ?? [];
+  const normalizedConclusion = String(conclusion ?? "").toLowerCase();
   const checks = [
     { id: "required_sources", pass: required.every((id) => cited.includes(id)), detail: required.length ? `Required: ${required.join(", ")}` : "No active transaction is required." },
     { id: "current_sources_only", pass: cited.every((id) => currentIds.has(id)), detail: "Citations must reference the current replay state." },
     { id: "forbidden_sources", pass: forbidden.every((id) => !cited.includes(id)), detail: forbidden.length ? `Do not cite: ${forbidden.join(", ")}` : "No stale source restriction." },
     { id: "limitations", pass: replay.contract.requiredLimitations.every((item) => statedLimitations.has(item)), detail: `Required limitations: ${replay.contract.requiredLimitations.join(", ") || "none"}` },
+    { id: "no_overclaim", pass: !prohibited.some((phrase) => normalizedConclusion.includes(phrase)), detail: prohibited.length ? `Do not claim: ${prohibited.join("; ")}` : "No fixture-specific overclaim restriction." },
     { id: "conclusion_present", pass: typeof conclusion === "string" && conclusion.trim().length > 0, detail: "A short conclusion is required." },
   ];
   return { caseId, passed: checks.every((check) => check.pass), checks, referenceConclusion: replay.contract.referenceConclusion };
 }
 
+export function demonstrateCase(caseId) {
+  const replay = replayCase(caseId);
+  const rejectedSource =
+    replay.contract.forbiddenSources?.[0] ??
+    replay.transactions[0]?.transaction_id;
+  const rejectedConclusion =
+    caseId === "R01"
+      ? "Monthly spending decreased."
+      : "The available transaction data proves this conclusion.";
+  const rejected = validateFinancialAnswer({
+    caseId,
+    conclusion: rejectedConclusion,
+    sourceTransactionIds: rejectedSource ? [rejectedSource] : [],
+    limitations: [],
+  });
+  const accepted = validateFinancialAnswer({
+    caseId,
+    conclusion: replay.contract.referenceConclusion,
+    sourceTransactionIds: replay.contract.requiredSources,
+    limitations: replay.contract.requiredLimitations,
+  });
+  return { rejected, accepted };
+}
+
 export function runReferenceSuite() {
   return replayCases.map((fixture) => {
-    const replay = replayCase(fixture.id);
     return {
       id: fixture.id,
       title: fixture.title,
-      ...validateFinancialAnswer({
-        caseId: fixture.id,
-        conclusion: replay.contract.referenceConclusion,
-        sourceTransactionIds: replay.contract.requiredSources,
-        limitations: replay.contract.requiredLimitations,
-      }),
+      ...demonstrateCase(fixture.id).accepted,
     };
   });
 }

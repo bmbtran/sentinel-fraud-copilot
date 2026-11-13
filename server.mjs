@@ -4,7 +4,12 @@ import { stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { audit, initializeDatabase, removePlaidTransactions, savePlaidTransactions } from "./src/replay-db.js";
-import { replayCase, replayCases, runReferenceSuite } from "./src/replay-suite.js";
+import {
+  demonstrateCase,
+  replayCase,
+  replayCases,
+  runReferenceSuite,
+} from "./src/replay-suite.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
@@ -93,7 +98,17 @@ async function syncPlaidTransactions() {
 function harness() {
   const runs = runReferenceSuite();
   return {
-    summary: { total: runs.length, passed: runs.filter((run) => run.passed).length, syncOperations: ["added", "modified", "removed"] },
+    summary: {
+      total: runs.length,
+      passed: runs.filter((run) => run.passed).length,
+      syncOperations: ["added", "modified", "removed"],
+      connectorVerification: {
+        client: "ChatGPT custom MCP connector",
+        caseId: "R02",
+        checksPassed: 5,
+        recordedAt: "2026-11-13",
+      },
+    },
     cases: replayCases,
     runs,
   };
@@ -121,7 +136,13 @@ createServer(async (request, response) => {
     if (request.method === "GET" && url.pathname === "/api/plaid/status") return sendJson(response, 200, await plaidStatus());
     if (request.method === "POST" && url.pathname === "/api/plaid/sync") return sendJson(response, 200, await syncPlaidTransactions());
     const replayMatch = url.pathname.match(/^\/api\/replay\/(R\d{2})$/);
-    if (request.method === "GET" && replayMatch) return sendJson(response, 200, replayCase(replayMatch[1]));
+    if (request.method === "GET" && replayMatch) {
+      const caseId = replayMatch[1];
+      return sendJson(response, 200, {
+        ...replayCase(caseId),
+        demonstrations: demonstrateCase(caseId),
+      });
+    }
     if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed." });
     return serveStatic(request, response);
   } catch (error) {

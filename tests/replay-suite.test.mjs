@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  demonstrateCase,
   replayCase,
   replayCases,
   runReferenceSuite,
@@ -41,6 +42,25 @@ test("answer validation requires partial-period disclosure", () => {
   });
   assert.equal(validation.passed, false);
   assert.equal(validation.checks.find((check) => check.id === "limitations").pass, false);
+});
+
+test("partial-period case rejects an overclaimed monthly conclusion", () => {
+  const validation = validateFinancialAnswer({
+    caseId: "R01",
+    conclusion: "Monthly spending decreased.",
+    sourceTransactionIds: ["oct-dining", "nov-dining"],
+    limitations: ["partial_period"],
+  });
+  assert.equal(validation.passed, false);
+  assert.equal(validation.checks.find((check) => check.id === "no_overclaim").pass, false);
+});
+
+test("every replay case includes a rejected and accepted answer demonstration", () => {
+  for (const fixture of replayCases) {
+    const demonstration = demonstrateCase(fixture.id);
+    assert.equal(demonstration.rejected.passed, false);
+    assert.equal(demonstration.accepted.passed, true);
+  }
 });
 
 test("reference contracts pass for every replay case", () => {

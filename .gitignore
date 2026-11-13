@@ -4,6 +4,8 @@
 .env.local
 node_modules/
 .local/
+.playwright-cli/
+output/playwright/
 dist/
 server.out.log
 server.err.log

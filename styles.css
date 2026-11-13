@@ -213,6 +213,46 @@ main {
   color: #7b899c;
   font-size: 10px;
 }
+.verification-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0;
+}
+.verdict {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 10px;
+}
+.verdict span,
+.verdict strong,
+.verdict p {
+  display: block;
+}
+.verdict span {
+  margin-bottom: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.verdict strong {
+  font-size: 21px;
+  letter-spacing: -0.8px;
+}
+.verdict p {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.verdict.reject {
+  border: 1px solid #efc2ce;
+  color: #8d1835;
+  background: var(--red-weak);
+}
+.verdict.accept {
+  border: 1px solid #badfc8;
+  color: #075e32;
+  background: var(--green-weak);
+}
 .danger-text {
   color: var(--red);
 }
@@ -828,6 +868,9 @@ td b {
   .metrics,
   .engine-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .verification-grid {
+    grid-template-columns: 1fr;
   }
   .section-grid,
   .alerts-layout,
