@@ -1,0 +1,40 @@
+src/openai-benchmark.mjs
+  s_0b84c363e40fea::t_3b915bb97995f0 2,103
+src/replay-suite.js
+  s_0b84c363e40fea::t_32716caf8d3a11 236,238-243,249-250
+  s_0b84c363e40fea::t_77320f93f3d0d0 30,42,54,76,111
+  s_0b84c363e40fea::t_ef34e9c1235476 65,88,100,122,133,144,155
+  s_0b84c363e40fea::t_8f120f21cf66f7 237
+tests/replay-suite.test.mjs
+  s_0b84c363e40fea::t_8f120f21cf66f7 58-67
+  s_0b84c363e40fea::t_130cd8bd8b49c9 68-87
+docs/first-openai-run.md
+  s_0b84c363e40fea::t_51f2e9cf33dddd 1-38
+docs/benchmark-protocol.md
+  s_0b84c363e40fea::t_09c05a16eab312 25
+README.md
+  s_0b84c363e40fea::t_51f2e9cf33dddd 61-65
+  s_0b84c363e40fea::t_016ab0c20b9770 59
+  s_0b84c363e40fea::t_75bcd592e6b48d 60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "27b0759091ab56fc4df6ee7980372304211c8552",
+  "prompts": {},
+  "humans": {
+    "h_d271a4f3bd2ed6": {
+      "author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b84c363e40fea": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d1b3-5923-7961-a065-4193167dd709",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Tran Bui <tranbuimddv@gmail.com>"
+    }
+  }
+}
